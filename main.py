@@ -1,29 +1,34 @@
 import pandas as pd
 from datetime import datetime
 
-from fetch import query, fakequery
+from fetch import load_queries, query
 from storage import load_existing_jobs, filter_duplicates, save_new_jobs
 
-def search_jobs() -> None:
-    search_term = "finite element c++"
-    location = "France"
+import argparse
 
-    scraped_jobs = query(search_term, location, results_wanted=10)
-    # scraped_jobs = fakequery(search_term, location)
+def search_jobs(trial=False) -> None:
+    if not trial:
+        queries = load_queries()
+    else:
+        queries = [{"search_term": "", "location": ""}]
 
-    if scraped_jobs.empty:
-        print("No jobs scraped.")
-        return
+    for q in queries:
+        print(f"Searching for '{q['search_term']}' in {q['location']}...")
+        scraped_jobs = query(**q, trial=trial)
 
-    existing_jobs = load_existing_jobs()
-    new_jobs = filter_duplicates(scraped_jobs, existing_jobs)
+        if scraped_jobs.empty:
+            print("No jobs scraped.")
+            return
 
-    if new_jobs.empty:
-        print(f"No new jobs found, database (size {len(existing_jobs)}) is up to date.")
-        return
+        existing_jobs = load_existing_jobs()
+        new_jobs = filter_duplicates(scraped_jobs, existing_jobs)
 
-    advertise_new_jobs(new_jobs)
-    save_new_jobs(new_jobs)
+        if new_jobs.empty:
+            print(f"No new jobs found, database (size {len(existing_jobs)}) is up to date.")
+            continue
+
+        advertise_new_jobs(new_jobs)
+        save_new_jobs(new_jobs)
 
 def advertise_new_jobs(new_jobs: pd.DataFrame) -> None:
     print(f"Found {len(new_jobs)} new jobs:")
@@ -48,4 +53,7 @@ def advertise_new_jobs(new_jobs: pd.DataFrame) -> None:
     print(f"Saved new jobs to: {filename}")
 
 if __name__=="__main__":
-    search_jobs()
+    parser = argparse.ArgumentParser(description="Search for new jobs and save them to the database.")
+    parser.add_argument("--trial", action="store_true", help="Run in trial mode with fake query.")
+    args = parser.parse_args()
+    search_jobs(trial=args.trial)
