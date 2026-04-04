@@ -2,9 +2,12 @@ import pandas as pd
 
 from storage import load_existing_jobs
 
+from textual.coordinate import Coordinate
 from textual.app import App, ComposeResult
 from textual.widgets import Footer
 from textual.binding import Binding
+from textual.screen import ModalScreen
+from textual.widgets import Static, Button
 from widgets import VimDataTable
 
 class JobListingsTUI(App):
@@ -12,12 +15,17 @@ class JobListingsTUI(App):
 
     CSS_PATH = "tui.tcss"
     BINDINGS = [
-        ("d", "toggle_dark", "Toggle dark mode"),
+        Binding("d", "toggle_dark", "Toggle dark mode"),
+        Binding("o", "open_job", "Open job details"),
     ]
 
-    def action_toggle_dark(self) -> None:
-            """An action to toggle dark mode."""
-            self.theme = ("textual-dark" if self.theme == "textual-light" else "textual-light")
+    def action_open_job(self) -> None:
+        table = self.query_one("#jobs", VimDataTable)
+        if table.cursor_row is not None:
+            job_id = table.get_cell_at(Coordinate(table.cursor_row, 0))
+            jobdetails = self._jobs[self._jobs["id"] == job_id]
+            job = jobdetails.iloc[0].to_dict()
+            self.push_screen(JobDetailScreen(job))
 
     def compose(self) -> ComposeResult:
         yield Footer()
@@ -40,12 +48,13 @@ class JobListingsTUI(App):
                 df.sort_values(by=sort_key, ascending=False, inplace=True)
 
         columns = [
+            "id",
             "title",
             "company",
             "location",
             "date_posted",
         ]
-        widths = [60, 30, 20, 15]
+        widths = [0, 60, 30, 20, 15]
         for col, width in zip(columns, widths):
             table.add_column(col, width=width)
 
@@ -57,6 +66,33 @@ class JobListingsTUI(App):
         table = self.query_one("#jobs", VimDataTable)
         table.cursor_type = "row"
         self._render_table(self._jobs)
+
+    def action_toggle_dark(self) -> None:
+            """An action to toggle dark mode."""
+            self.theme = ("textual-dark" if self.theme == "textual-light" else "textual-light")
+
+class JobDetailScreen(ModalScreen):
+    # id TEXT, site TEXT, job_url TEXT, job_url_direct TEXT, title TEXT, company TEXT, location TEXT, date_posted TEXT, job_type TEXT, salary_source FLOAT, interval FLOAT, min_amount FLOAT, max_amount FLOAT, currency FLOAT, is_remote BOOLEAN, job_level FLOAT, job_function FLOAT, listing_type FLOAT, emails TEXT, description TEXT, company_industry TEXT, company_url TEXT, company_logo TEXT, company_url_direct TEXT, company_addresses TEXT, company_num_employees TEXT, company_revenue TEXT, company_description TEXT, skills FLOAT, experience_range FLOAT, company_rating FLOAT, company_reviews_count FLOAT, vacancy_count FLOAT, work_from_home_type FLOAT
+    def __init__(self, job: dict) -> None:
+        super().__init__()
+        self.job = job
+
+    def compose(self) -> ComposeResult:
+        yield Static(f"Title: {self.job.get('title', '')}")
+        yield Static(f"Company: {self.job.get('company', '')}")
+        yield Static(f"Location: {self.job.get('location', '')}")
+        yield Static(f"Date Posted: {self.job.get('date_posted', '')}")
+        yield Static(f"Job Type: {self.job.get('job_type', '')}")
+        yield Static(f"Salary: {self.job.get('salary_source', '')} {self.job.get('currency', '')} per {self.job.get('interval', '')}")
+        yield Static(f"Remote: {'Yes' if self.job.get('is_remote') else 'No'}")
+        url = self.job.get('job_url_direct') or self.job.get('job_url', '')
+        yield Static(f"URL: {url}")
+        yield Static(f"Description:\n{self.job.get('description', '')}")
+        yield Button("Close", id="close")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "close":
+            self.dismiss()
 
 if __name__ == "__main__":
     app = JobListingsTUI()
