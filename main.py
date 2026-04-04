@@ -6,7 +6,7 @@ from storage import load_existing_jobs, filter_duplicates, save_new_jobs
 
 import argparse
 
-def search_jobs(trial=False) -> None:
+def search_jobs(results, trial=False) -> None:
     if not trial:
         queries = load_queries()
     else:
@@ -14,7 +14,7 @@ def search_jobs(trial=False) -> None:
 
     for q in queries:
         print(f"Searching for '{q['search_term']}' in {q['location']}...")
-        scraped_jobs = query(**q, trial=trial)
+        scraped_jobs = query(**q, results=results, trial=trial)
 
         if scraped_jobs.empty:
             print("No jobs scraped.")
@@ -54,6 +54,7 @@ def advertise_new_jobs(new_jobs: pd.DataFrame) -> None:
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description="Search for new jobs and save them to the database.")
+    parser.add_argument("--results", type=int, default=10, help="Number of job results to fetch per query.")
     parser.add_argument("--trial", action="store_true", help="Run in trial mode with fake query.")
     args = parser.parse_args()
-    search_jobs(trial=args.trial)
+    search_jobs(results=args.results, trial=args.trial)

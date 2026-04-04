@@ -20,6 +20,7 @@ def query(search_term, location, results_wanted=20, trial=False):
          location=location,
          country_indeed=get_country(location),
          results_wanted=results_wanted,
+         linkedin_fetch_description=True,
      )
     num_jobs_linkedin = (jobs["site"] == "linkedin").sum()
     num_jobs_indeed = (jobs["site"] == "indeed").sum()
