@@ -1,5 +1,5 @@
 from textual.containers import VerticalScroll
-from textual.widgets import DataTable
+from textual.widgets import DataTable, Input
 from textual.binding import Binding
 
 class VimDataTable(DataTable):
@@ -27,3 +27,16 @@ class VimVerticalScroll(VerticalScroll):
         Binding("u", "page_up", "Page Up", show=False),
         Binding("d", "page_down", "Page Down", show=False),
     ]
+
+class IntuitiveInput(Input):
+    BINDINGS = [
+        Binding("escape", "close", "Close", show=True),
+        Binding("enter", "submit", "Submit", show=True),
+    ]
+
+    def action_close(self) -> None:
+        close = getattr(self.screen, "action_close", None)
+        if close is not None:
+            close()
+        else:
+            self.screen.dismiss()
