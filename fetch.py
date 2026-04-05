@@ -1,10 +1,16 @@
 from jobspy import scrape_jobs
 import yaml
 
-queries_file = "queries.yaml"
-def load_queries():
-    with open(queries_file, "r") as f:
-        queries = yaml.safe_load(f)
+def load_queries(queries_file):
+    try:
+        with open(queries_file, "r") as f:
+            queries = yaml.safe_load(f)
+    except FileNotFoundError:
+        print(f"Error: Queries file '{queries_file}' not found.")
+        return []
+    except yaml.YAMLError as e:
+        print(f"Error parsing YAML file '{queries_file}': {e}")
+        return []
     return queries
 
 def get_country(location):
