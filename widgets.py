@@ -1,5 +1,6 @@
+from textual import events
 from textual.containers import VerticalScroll
-from textual.widgets import DataTable, Input
+from textual.widgets import DataTable, Input, RichLog
 from textual.binding import Binding
 
 class VimDataTable(DataTable):
@@ -40,3 +41,27 @@ class IntuitiveInput(Input):
             close()
         else:
             self.screen.dismiss()
+
+class VimPrinter(RichLog):
+    """A subclass of textual's RichLog which captures and displays all print calls."""
+    BINDINGS = [
+        Binding("k", "scroll_up", "Scroll Up", show=False),
+        Binding("j", "scroll_down", "Scroll Down", show=False),
+        Binding("h", "scroll_left", "Scroll Left", show=False),
+        Binding("l", "scroll_right", "Scroll Right", show=False),
+        Binding("0", "scroll_home", "Scroll Home", show=False),
+        Binding("$", "scroll_end", "Scroll End", show=False),
+        Binding("u", "page_up", "Page Up", show=False),
+        Binding("d", "page_down", "Page Down", show=False),
+        # Binding("ctrl+pageup", "page_left", "Page Left", show=False),
+        # Binding("ctrl+pagedown", "page_right", "Page Right", show=False),
+    ]
+
+    def on_mount(self) -> None:
+        self.wrap = True
+        self.markup = True
+        self.begin_capture_print()
+
+    def on_print(self, event: events.Print) -> None:
+        if (text := event.text) != "\n":
+            self.write(text.rstrip().replace("DEBUG", "[red]DEBUG[/]"))

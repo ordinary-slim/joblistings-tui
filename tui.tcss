@@ -4,9 +4,7 @@ ScrapeScreen {
 }
 
 #scrape-dialog {
-    width: 70%;
-    max-width: 80;
-    max-height: 70%;
+    width: 80%;
     padding: 1 2;
     border: round $primary;
     background: $surface;

@@ -7,8 +7,11 @@ from storage import load_existing_jobs, filter_duplicates, save_new_jobs
 import argparse
 
 def search_jobs(queries, results_wanted, trial=False) -> None:
+    if not queries:
+        print("No queries provided.")
+        return
     for q in queries:
-        print(f"Searching for '{q['search_term']}' in {q['location']}...")
+        print(f"Searching for '{q['search_term']}' in {q['location']}, this may take a moment...")
         scraped_jobs = query(**q, results_wanted=results_wanted, trial=trial)
 
         if scraped_jobs.empty:

@@ -7,18 +7,18 @@ from storage import load_existing_jobs, update_job_field
 from fetch import load_queries
 from main import search_jobs
 
-from textual import on
+from textual import on, work
 from textual.coordinate import Coordinate
 from textual.app import App, ComposeResult
 from textual.widgets import Footer
 from textual.binding import Binding
 from textual.screen import ModalScreen
-from textual.widgets import Static, Button, Checkbox, Label, Input
+from textual.widgets import Static, Button, Checkbox, Label, Input, Log
 from textual.validation import Number
 
 from textual.containers import Vertical, VerticalGroup, Horizontal, HorizontalGroup
 
-from widgets import VimDataTable, VimVerticalScroll, IntuitiveInput
+from widgets import VimDataTable, VimVerticalScroll, IntuitiveInput, VimPrinter
 
 TUIColumn = namedtuple("TUIColumn", ["name", "width"])
 columns = [
@@ -180,30 +180,39 @@ class JobDetailScreen(ModalScreen):
         self.dismiss({"job_id": self.job["id"], "updated" : self._updated})
 
 class ScrapeScreen(ModalScreen):
-    def __init__(self):
-        super().__init__()
+    BINDINGS = [
+        Binding("s", "scrape", "Scrape", show=True),
+        Binding("escape", "close", "Close", show=True),
+    ]
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self._queries_file = "queries.yaml"
-        self._queries = load_queries(self._queries_file)
+        self._all_queries = load_queries(self._queries_file)
 
     def compose(self) -> ComposeResult:
         with Vertical(id="scrape-dialog"):
-            with VimVerticalScroll(id="scrape-queries"):
-                yield Static(f"Queries loaded from {self._queries_file}:")
-                for q in self._queries:
-                    yield Static(
-                        f"Search Term: {q['search_term']}, Location: {q['location']}"
-                    )
+            yield Static(f"Queries loaded from `{self._queries_file}`")
 
-            with HorizontalGroup(id="scrape-actions"):
-                yield Button("Scrape", id="scrape")
-                yield Button("Cancel", id="close")
+            with VimVerticalScroll(id="query-list"):
+                for i, q in enumerate(self._all_queries):
+                    label = f"{q['search_term']} — {q['location']}"
+                    cb = Checkbox(label, value=True, id=f"query-{i}")
+                    cb.data = i # Add custom attribute to store the index of the query
+                    yield cb
+            yield VimPrinter(id="scrape-output")
+            yield Footer()
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "scrape":
-            search_jobs(self._queries, results_wanted=20)
-            self.dismiss()
-        elif event.button.id == "close":
-            self.dismiss()
+    def action_scrape(self) -> None:
+        selected = [
+            self._all_queries[cb.data]
+            for cb in self.query("#query-list Checkbox").results(Checkbox)
+            if cb.value
+        ]
+        self._run_scrape(selected)
+
+    @work(thread=True, exclusive=True)
+    def _run_scrape(self, queries) -> None:
+        search_jobs(queries, results_wanted=10)
 
     def action_close(self) -> None:
         self.dismiss()

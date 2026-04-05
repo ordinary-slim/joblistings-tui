@@ -11,6 +11,7 @@ def load_queries(queries_file):
     except yaml.YAMLError as e:
         print(f"Error parsing YAML file '{queries_file}': {e}")
         return []
+    assert isinstance(queries, list), f"Error: Expected a list of queries in '{queries_file}', but got {type(queries).__name__}."
     return queries
 
 def get_country(location):
