@@ -4,7 +4,7 @@ from collections import namedtuple
 import yaml
 
 from storage import load_existing_jobs, update_job_field
-from fetch import load_queries
+from fetch import load_queries, ALL_JOB_SITES, DEFAULT_JOB_SITES, JOB_SITE_LABELS
 from main import search_jobs
 
 from textual import on, work
@@ -14,7 +14,7 @@ from textual.widgets import Footer
 from textual.binding import Binding
 from textual.screen import ModalScreen
 from textual.widgets import Static, Button, Checkbox, Label, Input, Log
-from textual.validation import Number
+from textual.validation import Number, Integer
 
 from textual.containers import Vertical, VerticalGroup, Horizontal, HorizontalGroup
 
@@ -30,6 +30,7 @@ columns = [
     TUIColumn("fit_score", 10),
     TUIColumn("applied", 10),
 ]
+
 
 class JobListingsTUI(App):
     """A Textual app to display job listings."""
@@ -47,7 +48,9 @@ class JobListingsTUI(App):
         if table.cursor_row is not None:
             job_id = table.get_cell_at(Coordinate(table.cursor_row, 0))
             jobdetails = self._jobs[self._jobs["id"] == job_id].iloc[0].to_dict()
-            self.push_screen(JobDetailScreen(jobdetails), callback=self._refresh_job_row)
+            self.push_screen(
+                JobDetailScreen(jobdetails), callback=self._refresh_job_row
+            )
 
     def _refresh_job_row(self, result):
         if result and result.get("updated"):
@@ -61,7 +64,11 @@ class JobListingsTUI(App):
             hidden = updated_fields.pop("hidden", False)
             table = self.query_one("#jobs", VimDataTable)
             for field in updated_fields:
-                table.update_cell(row_key=job_id, column_key=field, value=str(self._jobs.at[job_index, field]))
+                table.update_cell(
+                    row_key=job_id,
+                    column_key=field,
+                    value=str(self._jobs.at[job_index, field]),
+                )
 
     def action_open_scrape_menu(self) -> None:
         self.push_screen(ScrapeScreen())
@@ -120,6 +127,7 @@ class JobDetailScreen(ModalScreen):
     BINDINGS = [
         Binding("escape", "close", "Close"),
     ]
+
     # id TEXT, site TEXT, job_url TEXT, job_url_direct TEXT, title TEXT, company TEXT, location TEXT, date_posted TEXT, job_type TEXT, salary_source FLOAT, interval FLOAT, min_amount FLOAT, max_amount FLOAT, currency FLOAT, is_remote BOOLEAN, job_level FLOAT, job_function FLOAT, listing_type FLOAT, emails TEXT, description TEXT, company_industry TEXT, company_url TEXT, company_logo TEXT, company_url_direct TEXT, company_addresses TEXT, company_num_employees TEXT, company_revenue TEXT, company_description TEXT, skills FLOAT, experience_range FLOAT, company_rating FLOAT, company_reviews_count FLOAT, vacancy_count FLOAT, work_from_home_type FLOAT
     def __init__(self, job: dict) -> None:
         super().__init__()
@@ -137,18 +145,22 @@ class JobDetailScreen(ModalScreen):
                 f"Salary: {self.job.get('salary_source', '')} {self.job.get('currency', '')} per {self.job.get('interval', '')}"
             )
             yield Static(f"Remote: {'Yes' if self.job.get('is_remote') else 'No'}")
-            url = self.job.get('job_url_direct') or self.job.get('job_url', '')
+            url = self.job.get("job_url_direct") or self.job.get("job_url", "")
             yield Static(f"URL: {url}")
             yield Static(f"Description:\n{self.job.get('description', '')}")
         with HorizontalGroup(id="job-actions"):
-            yield Checkbox("Applied", value=self.job["applied"], id="job-details-applied")
+            yield Checkbox(
+                "Applied", value=self.job["applied"], id="job-details-applied"
+            )
             yield Checkbox("Hidden", value=self.job["hidden"], id="job-details-hidden")
             yield Label("Interest score", id="job-details-interest-score-label")
-            yield IntuitiveInput(value=str(self.job["fit_score"]),
-                                 validators=Number(0.0, 10.0, "Enter a float between 0 and 10"),
-                                 max_length=4,
-                                 compact=True,
-                                 id="job-details-interest-score")
+            yield IntuitiveInput(
+                value=str(self.job["fit_score"]),
+                validators=Number(0.0, 10.0, "Enter a float between 0 and 10"),
+                max_length=4,
+                compact=True,
+                id="job-details-interest-score",
+            )
         yield Footer()
 
     def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
@@ -165,25 +177,31 @@ class JobDetailScreen(ModalScreen):
     def on_fit_score_submitted(self, event: IntuitiveInput.Submitted) -> None:
         if event.validation_result is None:
             return
-        if not(event.validation_result.failures):
+        if not (event.validation_result.failures):
             new_score = float(event.value)
             self.job["fit_score"] = new_score
             self._update_job_field_in_db("fit_score", new_score)
             self._updated["fit_score"] = new_score
         else:
-            self.notify(f"{event.validation_result.failures[0].description}", severity="error", timeout=3)
+            self.notify(
+                f"{event.validation_result.failures[0].description}",
+                severity="error",
+                timeout=3,
+            )
 
     def _update_job_field_in_db(self, field: str, value) -> None:
         update_job_field(self.job["id"], field, value)
 
     def action_close(self) -> None:
-        self.dismiss({"job_id": self.job["id"], "updated" : self._updated})
+        self.dismiss({"job_id": self.job["id"], "updated": self._updated})
+
 
 class ScrapeScreen(ModalScreen):
     BINDINGS = [
         Binding("s", "scrape", "Scrape", show=True),
         Binding("escape", "close", "Close", show=True),
     ]
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._queries_file = "queries.yaml"
@@ -192,30 +210,57 @@ class ScrapeScreen(ModalScreen):
     def compose(self) -> ComposeResult:
         with Vertical(id="scrape-dialog"):
             yield Static(f"Queries loaded from `{self._queries_file}`")
+            with Horizontal(id="scrape-top"):
+                with VimVerticalScroll(id="query-list"):
+                    for i, q in enumerate(self._all_queries):
+                        label = f"{q['search_term']} — {q['location']}"
+                        yield Checkbox(label, value=True, id=f"query-{i}")
 
-            with VimVerticalScroll(id="query-list"):
-                for i, q in enumerate(self._all_queries):
-                    label = f"{q['search_term']} — {q['location']}"
-                    cb = Checkbox(label, value=True, id=f"query-{i}")
-                    cb.data = i # Add custom attribute to store the index of the query
-                    yield cb
+                with Vertical(id="settings-pane"):
+                    yield Static("Scrape settings", classes="pane-title")
+
+                    yield Static("Job sites", classes="section-title")
+                    with VimVerticalScroll(id="site-list"):
+                        for site_key in ALL_JOB_SITES:
+                            yield Checkbox(
+                                JOB_SITE_LABELS[site_key], value=(site_key in DEFAULT_JOB_SITES), id=f"site-{site_key}"
+                            )
+
+                    yield Static("Results per query and site", classes="section-title")
+                    yield IntuitiveInput(
+                        value="10",
+                        validators=Integer(
+                            minimum=1, failure_description="Enter a number >= 1"
+                        ),
+                        max_length=4,
+                        compact=True,
+                        id="results-per-query-site",
+                    )
+
             yield VimPrinter(id="scrape-output")
             yield Footer()
 
     def action_scrape(self) -> None:
         selected = [
-            self._all_queries[cb.data]
+            self._all_queries[int(cb.id.split("-")[1])]
             for cb in self.query("#query-list Checkbox").results(Checkbox)
-            if cb.value
+            if cb.value and cb.id
         ]
-        self._run_scrape(selected)
+        results_wanted = self.query_one("#results-per-query-site", IntuitiveInput)
+        jobsites = [
+            site_key
+            for site_key in ALL_JOB_SITES
+            if self.query_one(f"#site-{site_key}", Checkbox).value
+        ]
+        self._run_scrape(selected, jobsites, results_wanted=int(results_wanted.value))
 
     @work(thread=True, exclusive=True)
-    def _run_scrape(self, queries) -> None:
-        search_jobs(queries, results_wanted=10)
+    def _run_scrape(self, queries, jobsites, results_wanted) -> None:
+        search_jobs(queries, jobsites=jobsites, results_wanted=results_wanted)
 
     def action_close(self) -> None:
         self.dismiss()
+
 
 if __name__ == "__main__":
     app = JobListingsTUI()

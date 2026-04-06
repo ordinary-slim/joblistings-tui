@@ -6,13 +6,13 @@ from storage import load_existing_jobs, filter_duplicates, save_new_jobs
 
 import argparse
 
-def search_jobs(queries, results_wanted, trial=False) -> None:
+def search_jobs(queries, jobsites, results_wanted, trial=False) -> None:
     if not queries:
         print("No queries provided.")
         return
     for q in queries:
-        print(f"Searching for '{q['search_term']}' in {q['location']}, this may take a moment...")
-        scraped_jobs = query(**q, results_wanted=results_wanted, trial=trial)
+        print(f"Searching for '{q['search_term']}' in {q['location']} on {', '.join(jobsites)}, this may take a moment...")
+        scraped_jobs = query(**q, jobsites=jobsites, results_wanted=results_wanted, trial=trial)
 
         if scraped_jobs.empty:
             print("No jobs scraped.")
@@ -53,6 +53,7 @@ def advertise_new_jobs(new_jobs: pd.DataFrame) -> None:
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description="Search for new jobs and save them to the database.")
     parser.add_argument("--queries", type=str, default="queries.yaml", help="Path to the YAML file containing search queries.")
+    parser.add_argument("--jobsites", nargs="+", default=["linkedin", "indeed"], help="List of job sites to scrape (e.g., linkedin indeed).")
     parser.add_argument("--results", type=int, default=10, help="Number of job results to fetch per query.")
     parser.add_argument("--trial", action="store_true", help="Run in trial mode with fake query.")
     args = parser.parse_args()
@@ -62,4 +63,5 @@ if __name__=="__main__":
     else:
         queries = [{"search_term": "", "location": ""}]
 
-    search_jobs(queries, results_wanted=args.results, trial=args.trial)
+    search_jobs(queries, jobsites=args.jobsites, results_wanted=args.results,
+                trial=args.trial)

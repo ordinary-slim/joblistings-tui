@@ -5,9 +5,48 @@ ScrapeScreen {
 
 #scrape-dialog {
     width: 80%;
+    height: 80%;
     padding: 1 2;
     border: round $primary;
     background: $surface;
+}
+
+#scrape-top {
+    height: 1fr;
+    margin-bottom: 1;
+}
+
+#query-list {
+    width: 2fr;
+    border: round $primary;
+    padding: 0 1;
+    margin-right: 1;
+}
+
+#settings-pane {
+    width: 1fr;
+    height: 1fr;
+    border: round $primary;
+    padding: 1;
+}
+
+.pane-title {
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+.section-title {
+    text-style: underline;
+    margin-bottom: 1;
+}
+
+#site-list {
+    height: 1fr;
+    margin-bottom: 1;
+}
+
+#scrape-output {
+    height: 10;
 }
 
 #scrape-queries {
@@ -62,3 +101,8 @@ JobDetailScreen {
     margin-bottom: 1;
     padding: 1 0 1 1;
 }
+
+/* #scrape-main { */
+/*     width: 100%; */
+/*     height: 1fr; */
+/* } */

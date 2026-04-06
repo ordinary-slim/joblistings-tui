@@ -1,6 +1,19 @@
 from jobspy import scrape_jobs
 import yaml
 
+ALL_JOB_SITES = ["LINKEDIN", "INDEED", "ZIPRECRUITER", "GLASSDOOR", "GOOGLE", "BAYT", "NAUKRI", "BDJOBS"]
+JOB_SITE_LABELS = {
+    "LINKEDIN": "LinkedIn",
+    "INDEED": "Indeed",
+    "ZIPRECRUITER": "ZipRecruiter",
+    "GLASSDOOR": "Glassdoor",
+    "GOOGLE": "Google",
+    "BAYT": "Bayt",
+    "NAUKRI": "Naukri",
+    "BDJOBS": "BDJobs",
+}
+DEFAULT_JOB_SITES = ["LINKEDIN", "INDEED"]
+
 def load_queries(queries_file):
     try:
         with open(queries_file, "r") as f:
@@ -17,10 +30,12 @@ def load_queries(queries_file):
 def get_country(location):
     return location.split(",")[-1].rstrip().lstrip().lower()
 
-jobsites = ["linkedin", "indeed"]
-def query(search_term, location, results_wanted=20, trial=False):
+def query(search_term, location, jobsites=DEFAULT_JOB_SITES, results_wanted=20, trial=False):
+    jobsites = [site.upper() for site in jobsites] if jobsites else DEFAULT_JOB_SITES
     if trial:
         return fakequery()
+    for site in jobsites:
+        assert site in ALL_JOB_SITES, f"Error: Unsupported job site '{site}'. Supported sites are: {', '.join(ALL_JOB_SITES)}."
     jobs = scrape_jobs(
          site_name=jobsites,
          search_term=search_term,
@@ -29,9 +44,9 @@ def query(search_term, location, results_wanted=20, trial=False):
          results_wanted=results_wanted,
          linkedin_fetch_description=True,
      )
-    num_jobs_linkedin = (jobs["site"] == "linkedin").sum()
-    num_jobs_indeed = (jobs["site"] == "indeed").sum()
-    print(f"Found {num_jobs_linkedin} jobs on LinkedIn and {num_jobs_indeed} jobs on Indeed for the search term '{search_term}' in {location}.")
+    for site in jobsites:
+        num_jobs_site = (jobs["site"] == site).sum()
+        print(f"Found {num_jobs_site} jobs on {JOB_SITE_LABELS[site]}.")
     return jobs
 
 def fakequery():
