@@ -1,5 +1,5 @@
 import pandas as pd
-from typing import Union
+from typing import Union, Sequence
 
 from sqlalchemy import create_engine, inspect, text
 
@@ -55,6 +55,15 @@ def initialize_db() -> None:
         conn.execute(create_stmt)
 
 
+def normalize_jobspy_dataframe(jobs: pd.DataFrame) -> pd.DataFrame:
+    '''Modify in-place but still return the DataFrame for chaining'''
+    jobs["applied"] = False
+    jobs["fit_score"] = 0.0
+    jobs["fit_keywords"] = ""
+    jobs["fit_reasoning"] = ""
+    jobs["hidden"] = False
+    return jobs
+
 def load_existing_jobs() -> pd.DataFrame:
     engine = create_engine(DB_URL)
 
@@ -100,9 +109,6 @@ def filter_duplicates(
 def save_new_jobs(new_jobs: pd.DataFrame) -> None:
     if new_jobs.empty:
         return
-    new_jobs["applied"] = False
-    new_jobs["fit_score"] = 5.0
-    new_jobs["hidden"] = False
 
     engine = create_engine(DB_URL)
 
@@ -115,19 +121,46 @@ def save_new_jobs(new_jobs: pd.DataFrame) -> None:
     print(f"Saved {len(new_jobs)} new jobs to the {TABLE_NAME} table in {DB_URL}.")
 
 
-def update_job_field(job_id: str, field: str, value: Union[float, bool]) -> None:
-    allowed_fields = {"applied", "hidden", "fit_score"}
-    if field not in allowed_fields:
-        raise ValueError(f"Unsupported field update: {field}")
+def update_job_field(
+    job_id: str,
+    fields: Union[str, Sequence[str]],
+    values: Union[float, bool, str, Sequence[Union[float, bool, str]]],
+) -> None:
+    allowed_fields = {"applied", "hidden", "fit_score", "fit_keywords", "fit_reasoning"}
+
+    # Normalize to lists
+    if isinstance(fields, str):
+        fields = [fields]
+    else:
+        fields = list(fields)
+
+    if isinstance(values, (list, tuple)):
+        values = list(values)
+    else:
+        values = [values]
+
+    # Validation
+    if len(fields) != len(values):
+        raise ValueError("field and value must have the same length")
+
+    for f in fields:
+        if f not in allowed_fields:
+            raise ValueError(f"Unsupported field update: {f}")
 
     engine = create_engine(DB_URL)
     inspector = inspect(engine)
     if TABLE_NAME not in inspector.get_table_names():
         raise RuntimeError(f"Table '{TABLE_NAME}' does not exist")
 
-    stmt = text(f"UPDATE {TABLE_NAME} SET {field} = :value WHERE id = :job_id")
+    # Build dynamic SET clause
+    set_clause = ", ".join(f"{f} = :{f}" for f in fields)
+
+    stmt = text(f"UPDATE {TABLE_NAME} SET {set_clause} WHERE id = :job_id")
+
+    params = {f: v for f, v in zip(fields, values)}
+    params["job_id"] = job_id
 
     with engine.begin() as conn:
-        result = conn.execute(stmt, {"value": value, "job_id": job_id})
+        result = conn.execute(stmt, params)
         if result.rowcount == 0:
             raise ValueError(f"No job found with id='{job_id}'")

@@ -102,6 +102,12 @@ JobDetailScreen {
     padding: 1 0 1 1;
 }
 
+#jobsites-grid {
+    grid-size: 3;
+    grid-gutter: 1 3;
+    grid-columns: 1fr 1fr;
+    height: auto;
+}
 /* #scrape-main { */
 /*     width: 100%; */
 /*     height: 1fr; */

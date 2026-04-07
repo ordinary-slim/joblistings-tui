@@ -2,12 +2,20 @@ import pandas as pd
 from datetime import datetime
 
 from fetch import load_queries, query
-from storage import load_existing_jobs, filter_duplicates, save_new_jobs
+from storage import (
+    load_existing_jobs,
+    filter_duplicates,
+    save_new_jobs,
+    normalize_jobspy_dataframe,
+)
+from fit_score import score_jobs
 
 import argparse
 
 
-def search_jobs(queries, jobsites, results_wanted, trial=False) -> pd.DataFrame:
+def search_jobs(
+    queries, jobsites, results_wanted, score=True, trial=False
+) -> pd.DataFrame:
     accumulated_new_jobs = pd.DataFrame()
     if not queries:
         print("No queries provided.")
@@ -34,7 +42,9 @@ def search_jobs(queries, jobsites, results_wanted, trial=False) -> pd.DataFrame:
                 f"No new jobs found, database (size {len(existing_jobs)}) is up to date."
             )
             continue
-
+        new_jobs = normalize_jobspy_dataframe(new_jobs)
+        if score:
+            new_jobs = score_jobs(new_jobs)
         advertise_new_jobs(new_jobs)
         save_new_jobs(new_jobs)
 
@@ -47,13 +57,29 @@ def search_jobs(queries, jobsites, results_wanted, trial=False) -> pd.DataFrame:
 
 
 def advertise_new_jobs(new_jobs: pd.DataFrame) -> None:
+    if new_jobs.empty:
+        print("No new jobs to advertise.")
+        return
+
     print(f"Found {len(new_jobs)} new jobs:")
 
+    if "site" in new_jobs.columns:
+        print("By site:")
+        for site, count in new_jobs["site"].value_counts().items():
+            print(f"- {site}: {count}")
+
+    print("Details:")
     for _, row in new_jobs.iterrows():
-        url = row.get("job_url_direct") or row.get("job_url") or "N/A"
+        if pd.notna(row["job_url_direct"]) and row["job_url_direct"] != "":
+            url = row["job_url_direct"]
+        elif pd.notna(row["job_url"]) and row["job_url"] != "":
+            url = row["job_url"]
+        else:
+            url = "N/A"
+
         print(
-            f"- {row.get('job_title', '')} at {row.get('company', '')} "
-            f"in {row.get('location', '')} (URL: {url})"
+            f"- {row['title']} at {row['company']} in {row['location']} "
+            f"(site: {row['site']}, fit_score: {row['fit_score']}, URL: {url})"
         )
 
     # --- write CSV with timestamp ---

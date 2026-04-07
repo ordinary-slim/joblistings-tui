@@ -1,4 +1,5 @@
 import json, re
+import pandas as pd
 
 import logging as log
 
@@ -25,6 +26,7 @@ SCORE: [1-10]
 KEYWORDS: [comma-separated ATS keywords from the job description that match or could match the candidate]
 REASONING: [2-3 sentences explaining the score]"""
 
+
 def _parse_score_response(response: str) -> dict:
     """Parse the LLM's score response into structured data.
 
@@ -38,12 +40,14 @@ def _parse_score_response(response: str) -> dict:
     keywords = ""
     reasoning = ""
 
-    print(response)
     for line in response.split("\n"):
         line = line.strip()
         if line.startswith("SCORE:"):
             try:
-                score = int(re.search(r"\d+", line).group())
+                match = re.search(r"\d+", line)
+                if match is None:
+                    raise ValueError("No numeric score found")
+                score = int(match.group())
                 score = max(1, min(10, score))
             except (AttributeError, ValueError):
                 score = 0
@@ -55,12 +59,15 @@ def _parse_score_response(response: str) -> dict:
     return {"score": score, "keywords": keywords, "reasoning": reasoning}
 
 
-def score_job(job: dict, resume_text: str = "",) -> dict:
+def score_job(
+    job: dict,
+    resume_text: str = "",
+) -> dict:
     """Score a single job against the resume.
 
     Args:
         resume_text: The candidate's full resume text.
-        job: Job dict with keys: title, site, location, full_description.
+        job: Job dict with keys: title, site, location, description.
 
     Returns:
         {"score": int, "keywords": str, "reasoning": str}
@@ -78,11 +85,18 @@ def score_job(job: dict, resume_text: str = "",) -> dict:
                 resume_text = f.read()
         except Exception as e:
             log.error("Error loading resume for scoring: %s", e)
-            return {"score": 0, "keywords": "", "reasoning": f"Error loading resume: {e}"}
+            return {
+                "score": 0,
+                "keywords": "",
+                "reasoning": f"Error loading resume: {e}",
+            }
 
     messages = [
         {"role": "system", "content": SCORE_PROMPT},
-        {"role": "user", "content": f"RESUME:\n{resume_text}\n\n---\n\nJOB POSTING:\n{job_text}"},
+        {
+            "role": "user",
+            "content": f"RESUME:\n{resume_text}\n\n---\n\nJOB POSTING:\n{job_text}",
+        },
     ]
 
     try:
@@ -92,3 +106,33 @@ def score_job(job: dict, resume_text: str = "",) -> dict:
     except Exception as e:
         log.error("LLM error scoring job '%s': %s", job.get("title", "?"), e)
         return {"score": 0, "keywords": "", "reasoning": f"LLM error: {e}"}
+
+
+def score_jobs(jobs: pd.DataFrame, resume_text: str = "") -> pd.DataFrame:
+    """Score jobs in place and add fit_* columns.
+
+    Mutates the input DataFrame by creating/updating:
+      - fit_score
+      - fit_keywords
+      - fit_reasoning
+    """
+
+    if jobs.empty:
+        return jobs
+
+    if not resume_text:
+        try:
+            with open(RESUME_MD, "r") as f:
+                resume_text = f.read()
+        except Exception as e:
+            log.error("Error loading resume for batch scoring: %s", e)
+            jobs["fit_reasoning"] = f"Error loading resume: {e}"
+            return jobs
+
+    for idx, job in jobs.iterrows():
+        score_data = score_job(job.to_dict(), resume_text=resume_text)
+        jobs.at[idx, "fit_score"] = score_data["score"]
+        jobs.at[idx, "fit_keywords"] = score_data["keywords"]
+        jobs.at[idx, "fit_reasoning"] = score_data["reasoning"]
+
+    return jobs

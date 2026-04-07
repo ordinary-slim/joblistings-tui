@@ -1,7 +1,9 @@
 import pandas as pd
 from collections import namedtuple
+from typing import Union, Sequence
 
 import yaml
+import pyperclip
 
 from storage import load_existing_jobs, update_job_field
 from fetch import load_queries, ALL_JOB_SITES, DEFAULT_JOB_SITES, JOB_SITE_LABELS
@@ -11,14 +13,20 @@ from fit_score import score_job
 from textual import on, work
 from textual.coordinate import Coordinate
 from textual.app import App, ComposeResult
-from textual.widgets import Footer
 from textual.binding import Binding
 from textual.screen import ModalScreen
-from textual.widgets import Static, Button, Checkbox, Label, Input, Log
+from textual.widgets import Footer, Static, Button, Checkbox, Label, Input, Log
 from textual.validation import Number, Integer
 from textual.worker import Worker, WorkerState
+from textual.reactive import reactive
 
-from textual.containers import Vertical, VerticalGroup, Horizontal, HorizontalGroup
+from textual.containers import (
+    Vertical,
+    VerticalGroup,
+    Horizontal,
+    HorizontalGroup,
+    Grid,
+)
 
 from widgets import VimDataTable, VimVerticalScroll, IntuitiveInput, VimPrinter
 
@@ -65,12 +73,14 @@ class JobListingsTUI(App):
             # Re-render table row
             hidden = updated_fields.pop("hidden", False)
             table = self.query_one("#jobs", VimDataTable)
+            visible_columns = {c.name for c in columns}
             for field in updated_fields:
-                table.update_cell(
-                    row_key=job_id,
-                    column_key=field,
-                    value=str(self._jobs.at[job_index, field]),
-                )
+                if field in visible_columns:
+                    table.update_cell(
+                        row_key=job_id,
+                        column_key=field,
+                        value=str(self._jobs.at[job_index, field]),
+                    )
 
     def action_open_scrape_menu(self) -> None:
         self.push_screen(ScrapeScreen(), callback=self._refresh_after_scrape)
@@ -137,8 +147,12 @@ class JobListingsTUI(App):
 class JobDetailScreen(ModalScreen):
     BINDINGS = [
         Binding("escape", "close", "Close"),
-        Binding("s",  "score", "LLM-score"),
+        Binding("y", "yank", "Copy URL"),
+        Binding("s", "score", "LLM-score"),
     ]
+
+    fit_keywords = reactive("")
+    fit_reasoning = reactive("")
 
     def __init__(self, job: dict) -> None:
         super().__init__()
@@ -156,9 +170,14 @@ class JobDetailScreen(ModalScreen):
                 f"Salary: {self.job.get('salary_source', '')} {self.job.get('currency', '')} per {self.job.get('interval', '')}"
             )
             yield Static(f"Remote: {'Yes' if self.job.get('is_remote') else 'No'}")
-            url = self.job.get("job_url_direct") or self.job.get("job_url", "")
-            yield Static(f"URL: {url}")
+            self.url = self.job.get("job_url_direct") or self.job.get("job_url", "")
+            yield Static(f"URL: {self.url}")
+
+            yield Static(id="fit-keywords")
+            yield Static(id="fit-reasoning")
+
             yield Static(f"Description:\n{self.job.get('description', '')}")
+
         with HorizontalGroup(id="job-actions"):
             yield Checkbox(
                 "Applied", value=self.job["applied"], id="job-details-applied"
@@ -174,6 +193,18 @@ class JobDetailScreen(ModalScreen):
             )
         yield Footer()
 
+    def on_mount(self) -> None:
+        self.fit_keywords = self.job["fit_keywords"]
+        self.fit_reasoning = self.job["fit_reasoning"]
+
+    def watch_fit_keywords(self, value):
+        self.query_one("#fit-keywords", Static).update(f"Fit Keywords: {value}")
+        # self._updated = {"fit_keywords": value}
+
+    def watch_fit_reasoning(self, value):
+        self.query_one("#fit-reasoning", Static).update(f"Fit Reasoning:\n{value}")
+        # self._updated = {"fit_reasoning": value}
+
     def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
         if event.checkbox.id == "job-details-applied":
             self.job["applied"] = event.value
@@ -184,7 +215,11 @@ class JobDetailScreen(ModalScreen):
             self._update_job_field_in_db("hidden", event.value)
             self._updated["hidden"] = event.value
 
-    def action_score(self, verbose = True) -> None:
+    def action_yank(self) -> None:
+        pyperclip.copy(self.url)
+        self.notify("URL copied.", timeout=3, severity="information")
+
+    def action_score(self, verbose=True) -> None:
         if verbose:
             self.notify("Scoring job with LLM...", timeout=5, severity="information")
         self._score_job_with_llm()
@@ -197,15 +232,42 @@ class JobDetailScreen(ModalScreen):
         """Called when the worker state changes."""
         if event.state == WorkerState.SUCCESS:
             result = event.worker.result
-            new_score, keywords, reasoning = result["score"], result["keywords"], result["reasoning"]
-            self.query_one("#job-details-interest-score", IntuitiveInput).value = str(new_score)
+            if result is None:
+                self.notify(
+                    "LLM scoring returned no result.", timeout=5, severity="error"
+                )
+                return
+            new_score, keywords, reasoning = (
+                result["score"],
+                result["keywords"],
+                result["reasoning"],
+            )
+            self.fit_keywords, self.fit_reasoning = keywords, reasoning
+            self.query_one("#job-details-interest-score", IntuitiveInput).value = str(
+                new_score
+            )
             if new_score:
                 self.job["fit_score"] = new_score
-                self._update_job_field_in_db("fit_score", new_score)
+                self.job["fit_keywords"] = keywords
+                self.job["fit_reasoning"] = reasoning
+                self._update_job_field_in_db(
+                    ["fit_score", "fit_keywords", "fit_reasoning"],
+                    [new_score, keywords, reasoning],
+                )
                 self._updated["fit_score"] = new_score
-                self.notify(f"LLM fit score: {new_score}\nKeywords: {keywords}\nReasoning: {reasoning}", timeout=5, severity="information")
+                self._updated["fit_keywords"] = keywords
+                self._updated["fit_reasoning"] = reasoning
+                self.notify(
+                    f"LLM fit score: {new_score}\nKeywords: {keywords}\nReasoning: {reasoning}",
+                    timeout=5,
+                    severity="information",
+                )
             else:
-                self.notify(f"LLM scoring failed. Reasoning: {reasoning}", timeout=5, severity="error")
+                self.notify(
+                    f"LLM scoring failed. Reasoning: {reasoning}",
+                    timeout=5,
+                    severity="error",
+                )
 
     @on(IntuitiveInput.Submitted)
     def on_fit_score_submitted(self, event: IntuitiveInput.Submitted) -> None:
@@ -223,8 +285,12 @@ class JobDetailScreen(ModalScreen):
                 timeout=3,
             )
 
-    def _update_job_field_in_db(self, field: str, value) -> None:
-        update_job_field(self.job["id"], field, value)
+    def _update_job_field_in_db(
+        self,
+        fields: Union[str, Sequence[str]],
+        values: Union[float, bool, str, Sequence[Union[float, bool, str]]],
+    ) -> None:
+        update_job_field(self.job["id"], fields, values)
 
     def action_close(self) -> None:
         self.dismiss({"job_id": self.job["id"], "updated": self._updated})
@@ -244,18 +310,15 @@ class ScrapeScreen(ModalScreen):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="scrape-dialog"):
-            yield Static(f"Queries loaded from `{self._queries_file}`")
             with Horizontal(id="scrape-top"):
                 with VimVerticalScroll(id="query-list"):
+                    yield Static(f"Queries loaded from `{self._queries_file}`")
                     for i, q in enumerate(self._all_queries):
                         label = f"{q['search_term']} — {q['location']}"
                         yield Checkbox(label, value=True, id=f"query-{i}")
 
-                with Vertical(id="settings-pane"):
-                    yield Static("Scrape settings", classes="pane-title")
-
                     yield Static("Job sites", classes="section-title")
-                    with VimVerticalScroll(id="site-list"):
+                    with Grid(id="jobsites-grid"):
                         for site_key in ALL_JOB_SITES:
                             yield Checkbox(
                                 JOB_SITE_LABELS[site_key],
@@ -263,7 +326,10 @@ class ScrapeScreen(ModalScreen):
                                 id=f"site-{site_key}",
                             )
 
-                    yield Static("Results per query and site", classes="section-title")
+                with Vertical(id="settings-pane"):
+                    yield Static("Scrape settings", classes="pane-title")
+
+                    yield Label("Results per query and site:")
                     yield IntuitiveInput(
                         value="10",
                         validators=Integer(
@@ -272,6 +338,12 @@ class ScrapeScreen(ModalScreen):
                         max_length=4,
                         compact=True,
                         id="results-per-query-site",
+                    )
+                    # Checkbox for "Score with LLM"
+                    yield Checkbox(
+                        "Score with LLM",
+                        value=True,
+                        id="scrape-score-with-llm",
                     )
 
             yield VimPrinter(id="scrape-output")
@@ -283,25 +355,34 @@ class ScrapeScreen(ModalScreen):
             for cb in self.query("#query-list Checkbox").results(Checkbox)
             if cb.value and cb.id
         ]
-        results_wanted = self.query_one("#results-per-query-site", IntuitiveInput)
+        results_wanted = int(
+            self.query_one("#results-per-query-site", IntuitiveInput).value
+        )
+        score = self.query_one("#scrape-score-with-llm", Checkbox).value
         jobsites = [
             site_key
             for site_key in ALL_JOB_SITES
             if self.query_one(f"#site-{site_key}", Checkbox).value
         ]
-        self._run_scrape(selected, jobsites, results_wanted=int(results_wanted.value))
+        self._run_scrape(selected, jobsites, score, results_wanted)
 
     @work(thread=True, exclusive=True)
-    def _run_scrape(self, queries, jobsites, results_wanted) -> None:
+    def _run_scrape(self, queries, jobsites, score, results_wanted) -> None:
         new_jobs = search_jobs(
-            queries, jobsites=jobsites, results_wanted=results_wanted
+            queries,
+            jobsites=jobsites,
+            score=score,
+            results_wanted=results_wanted,
         )
         self._scrape_result = {
-            "new_jobs": pd.concat([self._scrape_result["new_jobs"],
-                                   new_jobs], ignore_index=True)}
+            "new_jobs": pd.concat(
+                [self._scrape_result["new_jobs"], new_jobs], ignore_index=True
+            )
+        }
 
     def action_close(self) -> None:
         self.dismiss(self._scrape_result)
+
 
 if __name__ == "__main__":
     app = JobListingsTUI()
