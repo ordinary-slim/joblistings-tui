@@ -1,3 +1,4 @@
+import pandas as pd
 from jobspy import scrape_jobs
 import yaml
 
@@ -30,7 +31,7 @@ def load_queries(queries_file):
 def get_country(location):
     return location.split(",")[-1].rstrip().lstrip().lower()
 
-def query(search_term, location, jobsites=DEFAULT_JOB_SITES, results_wanted=20, trial=False):
+def query(search_term, location, jobsites=DEFAULT_JOB_SITES, results_wanted=20, trial=False) -> pd.DataFrame:
     jobsites = [site.upper() for site in jobsites] if jobsites else DEFAULT_JOB_SITES
     if trial:
         return fakequery()
@@ -44,9 +45,11 @@ def query(search_term, location, jobsites=DEFAULT_JOB_SITES, results_wanted=20, 
          results_wanted=results_wanted,
          linkedin_fetch_description=True,
      )
-    for site in jobsites:
-        num_jobs_site = (jobs["site"] == site).sum()
-        print(f"Found {num_jobs_site} jobs on {JOB_SITE_LABELS[site]}.")
+    if not jobs.empty:
+        for site in jobsites:
+            num_jobs_site = (jobs["site"] == site).sum()
+            print(f"Found {num_jobs_site} jobs on {JOB_SITE_LABELS[site]}.")
+    jobs['date_posted'] = pd.to_datetime(jobs['date_posted'], errors='coerce')  # Uniform 
     return jobs
 
 def fakequery():

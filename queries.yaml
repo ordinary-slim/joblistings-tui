@@ -1,4 +1,59 @@
-- search_term: finite element c++
-  location: France
-# - search_term: computational mechanics
+# - search_term: "finite element c++"
 #   location: Spain
+#
+# - search_term: "finite element c++"
+#   location: France
+#
+# - search_term: "finite element c++"
+#   location: Germany
+#
+# - search_term: "finite element c++"
+#   location: Switzerland
+
+- search_term: "multiphysics simulation"
+  location: Spain
+
+- search_term: "multiphysics simulation"
+  location: Germany
+
+# - search_term: "scientific computing engineer HPC"
+#   location: Spain
+#
+# - search_term: "HPC engineer MPI C++"
+#   location: Spain
+#
+# - search_term: "computational mechanics engineer FEM"
+#   location: France
+#
+# - search_term: "numerical simulation engineer scientific computing"
+#   location: France
+#
+# - search_term: "HPC scientific computing MPI C++"
+#   location: Germany
+#
+# - search_term: "research engineer computational mechanics FEM"
+#   location: Germany
+#
+# - search_term: "scientific software engineer HPC"
+#   location: United Kingdom
+#
+# - search_term: "numerical methods engineer scientific computing"
+#   location: United Kingdom
+#
+# - search_term: "scientific computing engineer FEM"
+#   location: Switzerland
+#
+# - search_term: "HPC engineer scientific software MPI"
+#   location: Switzerland
+#
+# - search_term: "simulation engineer finite element multiphysics"
+#   location: France
+#
+# - search_term: "CFD engineer HPC scientific computing"
+#   location: Germany
+#
+# - search_term: "research engineer numerical simulation HPC"
+#   location: Spain
+#
+# - search_term: "scientific developer C++ HPC simulation"
+#   location: Europe

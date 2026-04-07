@@ -6,27 +6,45 @@ from storage import load_existing_jobs, filter_duplicates, save_new_jobs
 
 import argparse
 
-def search_jobs(queries, jobsites, results_wanted, trial=False) -> None:
+
+def search_jobs(queries, jobsites, results_wanted, trial=False) -> pd.DataFrame:
+    accumulated_new_jobs = pd.DataFrame()
     if not queries:
         print("No queries provided.")
-        return
+        return accumulated_new_jobs
+
+    existing_jobs = load_existing_jobs()
+
     for q in queries:
-        print(f"Searching for '{q['search_term']}' in {q['location']} on {', '.join(jobsites)}, this may take a moment...")
-        scraped_jobs = query(**q, jobsites=jobsites, results_wanted=results_wanted, trial=trial)
+        print(
+            f"Searching for '{q['search_term']}' in {q['location']} on {', '.join(jobsites)}, this may take a moment..."
+        )
+        scraped_jobs = query(
+            **q, jobsites=jobsites, results_wanted=results_wanted, trial=trial
+        )
 
         if scraped_jobs.empty:
-            print("No jobs scraped.")
-            return
+            print("No jobs scraped for this query.")
+            continue
 
-        existing_jobs = load_existing_jobs()
         new_jobs = filter_duplicates(scraped_jobs, existing_jobs)
 
         if new_jobs.empty:
-            print(f"No new jobs found, database (size {len(existing_jobs)}) is up to date.")
+            print(
+                f"No new jobs found, database (size {len(existing_jobs)}) is up to date."
+            )
             continue
 
         advertise_new_jobs(new_jobs)
         save_new_jobs(new_jobs)
+
+        accumulated_new_jobs = pd.concat(
+            [accumulated_new_jobs, new_jobs], ignore_index=True
+        )
+        existing_jobs = pd.concat([existing_jobs, new_jobs], ignore_index=True)
+
+    return accumulated_new_jobs
+
 
 def advertise_new_jobs(new_jobs: pd.DataFrame) -> None:
     print(f"Found {len(new_jobs)} new jobs:")
@@ -50,12 +68,32 @@ def advertise_new_jobs(new_jobs: pd.DataFrame) -> None:
 
     print(f"Saved new jobs to: {filename}")
 
-if __name__=="__main__":
-    parser = argparse.ArgumentParser(description="Search for new jobs and save them to the database.")
-    parser.add_argument("--queries", type=str, default="queries.yaml", help="Path to the YAML file containing search queries.")
-    parser.add_argument("--jobsites", nargs="+", default=["linkedin", "indeed"], help="List of job sites to scrape (e.g., linkedin indeed).")
-    parser.add_argument("--results", type=int, default=10, help="Number of job results to fetch per query.")
-    parser.add_argument("--trial", action="store_true", help="Run in trial mode with fake query.")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Search for new jobs and save them to the database."
+    )
+    parser.add_argument(
+        "--queries",
+        type=str,
+        default="queries.yaml",
+        help="Path to the YAML file containing search queries.",
+    )
+    parser.add_argument(
+        "--jobsites",
+        nargs="+",
+        default=["linkedin", "indeed"],
+        help="List of job sites to scrape (e.g., linkedin indeed).",
+    )
+    parser.add_argument(
+        "--results",
+        type=int,
+        default=10,
+        help="Number of job results to fetch per query.",
+    )
+    parser.add_argument(
+        "--trial", action="store_true", help="Run in trial mode with fake query."
+    )
     args = parser.parse_args()
 
     if not args.trial:
@@ -63,5 +101,6 @@ if __name__=="__main__":
     else:
         queries = [{"search_term": "", "location": ""}]
 
-    search_jobs(queries, jobsites=args.jobsites, results_wanted=args.results,
-                trial=args.trial)
+    search_jobs(
+        queries, jobsites=args.jobsites, results_wanted=args.results, trial=args.trial
+    )
