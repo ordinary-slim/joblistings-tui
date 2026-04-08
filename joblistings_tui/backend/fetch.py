@@ -47,7 +47,7 @@ def query(search_term, location, jobsites=DEFAULT_JOB_SITES, results_wanted=20, 
      )
     if not jobs.empty:
         for site in jobsites:
-            num_jobs_site = (jobs["site"] == site).sum()
+            num_jobs_site = (jobs["site"].fillna("").str.casefold() == site.casefold()).sum()
             print(f"Found {num_jobs_site} jobs on {JOB_SITE_LABELS[site]}.")
     jobs['date_posted'] = pd.to_datetime(jobs['date_posted'], errors='coerce')  # Uniform 
     return jobs

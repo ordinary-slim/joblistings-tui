@@ -14,6 +14,7 @@ LLM_MODEL env var overrides the model name for any provider.
 import logging
 import os
 import time
+from collections.abc import Callable
 
 import httpx
 
@@ -22,6 +23,7 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Provider detection
 # ---------------------------------------------------------------------------
+
 
 def _detect_provider() -> tuple[str, str, str]:
     """Return (base_url, model, api_key) based on environment variables.
@@ -192,14 +194,19 @@ class LLMClient:
         messages: list[dict],
         temperature: float = 0.0,
         max_tokens: int = 4096,
+        status_callback: Callable[[str], None] | None = None,
     ) -> str:
         """Send a chat completion request and return the assistant message text."""
         # Qwen3 optimization: prepend /no_think to skip chain-of-thought
         # reasoning, saving tokens on structured extraction tasks.
         if "qwen" in self.model.lower() and messages:
             first = messages[0]
-            if first.get("role") == "user" and not first["content"].startswith("/no_think"):
-                messages = [{"role": first["role"], "content": f"/no_think\n{first['content']}"}] + messages[1:]
+            if first.get("role") == "user" and not first["content"].startswith(
+                "/no_think"
+            ):
+                messages = [
+                    {"role": first["role"], "content": f"/no_think\n{first['content']}"}
+                ] + messages[1:]
 
         for attempt in range(_MAX_RETRIES):
             try:
@@ -232,17 +239,16 @@ class LLMClient:
                 resp = exc.response
                 if resp.status_code in (429, 503) and attempt < _MAX_RETRIES - 1:
                     # Respect Retry-After header if provided (Gemini sends this).
-                    retry_after = (
-                        resp.headers.get("Retry-After")
-                        or resp.headers.get("X-RateLimit-Reset-Requests")
+                    retry_after = resp.headers.get("Retry-After") or resp.headers.get(
+                        "X-RateLimit-Reset-Requests"
                     )
                     if retry_after:
                         try:
                             wait = float(retry_after)
                         except (ValueError, TypeError):
-                            wait = _RATE_LIMIT_BASE_WAIT * (2 ** attempt)
+                            wait = _RATE_LIMIT_BASE_WAIT * (2**attempt)
                     else:
-                        wait = min(_RATE_LIMIT_BASE_WAIT * (2 ** attempt), 60)
+                        wait = min(_RATE_LIMIT_BASE_WAIT * (2**attempt), 60)
 
                     log.warning(
                         "LLM rate limited (HTTP %s). Waiting %ds before retry %d/%d. "
@@ -250,17 +256,25 @@ class LLMClient:
                         "or switching to a local model.",
                         resp.status_code, wait, attempt + 1, _MAX_RETRIES,
                     )
+                    if status_callback is not None:
+                        status_callback(
+                            f"LLM rate limited (HTTP {resp.status_code}). Retrying in {int(wait)}s ({attempt + 1}/{_MAX_RETRIES})."
+                        )
                     time.sleep(wait)
                     continue
                 raise
 
             except httpx.TimeoutException:
                 if attempt < _MAX_RETRIES - 1:
-                    wait = min(_RATE_LIMIT_BASE_WAIT * (2 ** attempt), 60)
+                    wait = min(_RATE_LIMIT_BASE_WAIT * (2**attempt), 60)
                     log.warning(
                         "LLM request timed out, retrying in %ds (attempt %d/%d)",
                         wait, attempt + 1, _MAX_RETRIES,
                     )
+                    if status_callback is not None:
+                        status_callback(
+                            f"LLM request timed out. Retrying in {int(wait)}s ({attempt + 1}/{_MAX_RETRIES})."
+                        )
                     time.sleep(wait)
                     continue
                 raise

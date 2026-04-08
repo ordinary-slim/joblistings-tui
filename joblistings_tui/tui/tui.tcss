@@ -112,3 +112,15 @@ JobDetailScreen {
 /*     width: 100%; */
 /*     height: 1fr; */
 /* } */
+
+#search-bar {
+  height: auto;
+}
+
+#search-terms-input {
+    width: 1fr;
+}
+
+#search-location-input {
+    width: 1fr;
+}

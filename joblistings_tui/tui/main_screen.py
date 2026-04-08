@@ -67,16 +67,19 @@ class JobListingsTUI(App):
             for field, value in updated_fields.items():
                 self._jobs.at[job_index, field] = value
             # Re-render table row
-            hidden = updated_fields.pop("hidden", False)
             table = self.query_one("#jobs", VimDataTable)
-            visible_columns = {c.name for c in columns}
-            for field in updated_fields:
-                if field in visible_columns:
-                    table.update_cell(
-                        row_key=job_id,
-                        column_key=field,
-                        value=str(self._jobs.at[job_index, field]),
-                    )
+            hidden = updated_fields.pop("hidden", False)
+            if hidden:
+                table.remove_row(job_id)
+            else:
+                visible_columns = {c.name for c in columns}
+                for field in updated_fields:
+                    if field in visible_columns:
+                        table.update_cell(
+                            row_key=job_id,
+                            column_key=field,
+                            value=str(self._jobs.at[job_index, field]),
+                        )
 
     def action_open_scrape_menu(self) -> None:
         self.push_screen(ScrapeScreen(), callback=self._refresh_after_scrape)
@@ -118,6 +121,8 @@ class JobListingsTUI(App):
         self._jobs_by_id = dict()
 
         for _, row in df.iterrows():
+            if row.get("hidden", False):
+                continue
             values = [row[c.name] for c in columns]
             table.add_row(*[str(v) for v in values], key=row["id"])
             self._jobs_by_id[row["id"]] = row

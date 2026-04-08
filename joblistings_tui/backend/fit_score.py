@@ -1,5 +1,6 @@
 import re
 import pandas as pd
+from collections.abc import Callable
 
 import logging as log
 
@@ -62,6 +63,7 @@ def _parse_score_response(response: str) -> dict:
 def score_job(
     job: dict,
     resume_text: str = "",
+    status_callback: Callable[[str], None] | None = None,
 ) -> dict:
     """Score a single job against the resume.
 
@@ -101,7 +103,12 @@ def score_job(
 
     try:
         client = get_client()
-        response = client.chat(messages, max_tokens=512, temperature=0.2)
+        response = client.chat(
+            messages,
+            max_tokens=512,
+            temperature=0.2,
+            status_callback=status_callback,
+        )
         return _parse_score_response(response)
     except Exception as e:
         log.error("LLM error scoring job '%s': %s", job.get("title", "?"), e)

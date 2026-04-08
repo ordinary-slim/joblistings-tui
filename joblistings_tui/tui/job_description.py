@@ -20,6 +20,7 @@ from textual.containers import (
 
 from .widgets import VimVerticalScroll, IntuitiveInput
 
+
 class JobDetailScreen(ModalScreen):
     BINDINGS = [
         Binding("escape", "close", "Close"),
@@ -102,7 +103,15 @@ class JobDetailScreen(ModalScreen):
 
     @work(thread=True, exclusive=True)
     def _score_job_with_llm(self) -> dict:
-        return score_job(self.job)
+        def status_callback(message: str) -> None:
+            self.app.call_from_thread(
+                self.notify,
+                message,
+                timeout=6,
+                severity="warning",
+            )
+
+        return score_job(self.job, status_callback=status_callback)
 
     def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
         """Called when the worker state changes."""
@@ -139,9 +148,30 @@ class JobDetailScreen(ModalScreen):
                     severity="information",
                 )
             else:
+                if "timeout" in reasoning.lower() or "timed out" in reasoning.lower():
+                    self.notify(
+                        "LLM request timed out. Try again or reduce model latency.",
+                        timeout=6,
+                        severity="error",
+                    )
                 self.notify(
                     f"LLM scoring failed. Reasoning: {reasoning}",
                     timeout=5,
+                    severity="error",
+                )
+        elif event.state == WorkerState.ERROR:
+            error = event.worker.error
+            message = str(error) if error else "Unknown worker error"
+            if "timeout" in message.lower() or "timed out" in message.lower():
+                self.notify(
+                    f"LLM request timed out: {message}",
+                    timeout=6,
+                    severity="error",
+                )
+            else:
+                self.notify(
+                    f"LLM scoring failed: {message}",
+                    timeout=6,
                     severity="error",
                 )
 
@@ -170,5 +200,3 @@ class JobDetailScreen(ModalScreen):
 
     def action_close(self) -> None:
         self.dismiss({"job_id": self.job["id"], "updated": self._updated})
-
-

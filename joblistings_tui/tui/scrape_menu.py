@@ -35,10 +35,22 @@ class ScrapeScreen(ModalScreen):
         with Vertical(id="scrape-dialog"):
             with Horizontal(id="scrape-top"):
                 with VimVerticalScroll(id="query-list"):
-                    yield Static(f"Queries loaded from `{self._queries_file}`")
-                    for i, q in enumerate(self._all_queries):
-                        label = f"{q['search_term']} — {q['location']}"
-                        yield Checkbox(label, value=True, id=f"query-{i}")
+                    # yield Static(f"Queries loaded from `{self._queries_file}`")
+                    # for i, q in enumerate(self._all_queries):
+                    #     label = f"{q['search_term']} — {q['location']}"
+                    #     yield Checkbox(label, value=True, id=f"query-{i}")
+                    yield Static("Search:", id="search-bar-header")
+                    with Horizontal(id="search-bar"):
+                        yield IntuitiveInput(
+                            placeholder="software developper",
+                            id="search-terms-input",
+                            max_length=50,
+                        )
+                        yield IntuitiveInput(
+                            placeholder="Barcelona, Spain",
+                            id="search-location-input",
+                            max_length=30,
+                        )
 
                     yield Static("Job sites", classes="section-title")
                     with Grid(id="jobsites-grid"):
@@ -73,11 +85,15 @@ class ScrapeScreen(ModalScreen):
             yield Footer()
 
     def action_scrape(self) -> None:
-        selected = [
-            self._all_queries[int(cb.id.split("-")[1])]
-            for cb in self.query("#query-list Checkbox").results(Checkbox)
-            if cb.value and cb.id
-        ]
+        # selected = [
+        #     self._all_queries[int(cb.id.split("-")[1])]
+        #     for cb in self.query("#query-list Checkbox").results(Checkbox)
+        #     if cb.value and cb.id
+        # ]
+        query = {
+                "search_term" : self.query_one("#search-terms-input", IntuitiveInput).value,
+                "location" : self.query_one("#search-location-input", IntuitiveInput).value,
+        }
         results_wanted = int(
             self.query_one("#results-per-query-site", IntuitiveInput).value
         )
@@ -87,7 +103,7 @@ class ScrapeScreen(ModalScreen):
             for site_key in ALL_JOB_SITES
             if self.query_one(f"#site-{site_key}", Checkbox).value
         ]
-        self._run_scrape(selected, jobsites, score, results_wanted)
+        self._run_scrape([query], jobsites, score, results_wanted)
 
     @work(thread=True, exclusive=True)
     def _run_scrape(self, queries, jobsites, score, results_wanted) -> None:
