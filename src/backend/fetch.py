@@ -53,8 +53,9 @@ def query(search_term, location, jobsites=DEFAULT_JOB_SITES, results_wanted=20, 
     return jobs
 
 def fakequery():
+    # TODO: Move this to a test
     import pandas as pd
-    csvfile = "c++-fem-france-2026-04-03-13:00.csv"
+    csvfile = "./data/c++-fem-france-2026-04-03-13:00.csv"
     df = pd.read_csv(csvfile)
     print(f"Loaded {len(df)} jobs from {csvfile} for the search term 'c++ finite lement' in France.")
     return df

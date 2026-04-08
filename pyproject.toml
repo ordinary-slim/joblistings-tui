@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "joblistings_tui"
+version = "0.1.0"
+
+[tool.setuptools]
+package-dir = {"" = "joblistings_tui"}
+
+[tool.setuptools.packages.find]
+where = ["joblistings_tui"]

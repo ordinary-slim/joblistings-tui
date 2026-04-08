@@ -1,16 +1,17 @@
 import pandas as pd
 from datetime import datetime
 
-from fetch import load_queries, query
-from storage import (
+from .fetch import load_queries, query
+from .storage import (
     load_existing_jobs,
     filter_duplicates,
     save_new_jobs,
     normalize_jobspy_dataframe,
 )
-from fit_score import score_jobs
+from .fit_score import score_jobs
 
 import argparse
+from config import QUERIES_FILE
 
 
 def search_jobs(
@@ -102,7 +103,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--queries",
         type=str,
-        default="queries.yaml",
+        default=QUERIES_FILE,
         help="Path to the YAML file containing search queries.",
     )
     parser.add_argument(

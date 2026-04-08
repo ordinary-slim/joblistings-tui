@@ -1,9 +1,9 @@
-import json, re
+import re
 import pandas as pd
 
 import logging as log
 
-from llm import get_client
+from .llm import get_client
 from config import RESUME_MD
 
 SCORE_PROMPT = """You are a job fit evaluator. Given a candidate's resume and a job description, score how well the candidate fits the role.

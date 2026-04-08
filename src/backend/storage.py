@@ -3,7 +3,7 @@ from typing import Union, Sequence
 
 from sqlalchemy import create_engine, inspect, text
 
-DB_URL = "sqlite:///jobs.db"
+DB_URL = "sqlite:///data/jobs.db"
 TABLE_NAME = "jobs"
 
 def initialize_db() -> None:
@@ -121,7 +121,7 @@ def save_new_jobs(new_jobs: pd.DataFrame) -> None:
     print(f"Saved {len(new_jobs)} new jobs to the {TABLE_NAME} table in {DB_URL}.")
 
 
-def update_job_field(
+def update_job_fields(
     job_id: str,
     fields: Union[str, Sequence[str]],
     values: Union[float, bool, str, Sequence[Union[float, bool, str]]],
