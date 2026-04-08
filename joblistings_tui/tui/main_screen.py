@@ -1,5 +1,6 @@
 import pandas as pd
 from collections import namedtuple
+from rich.text import Text
 
 import pyperclip
 
@@ -27,6 +28,7 @@ columns = [
     TUIColumn("applied", 10),
 ]
 
+
 class JobListingsTUI(App):
     """A Textual app to display job listings."""
 
@@ -42,7 +44,7 @@ class JobListingsTUI(App):
     def action_open_job(self) -> None:
         table = self.query_one("#jobs", VimDataTable)
         if table.cursor_row is not None:
-            job_id = table.get_cell_at(Coordinate(table.cursor_row, 0))
+            job_id = table.get_cell_at(Coordinate(table.cursor_row, 0)).plain
             jobdetails = self._jobs[self._jobs["id"] == job_id].iloc[0].to_dict()
             self.push_screen(
                 JobDetailScreen(jobdetails), callback=self._refresh_job_row
@@ -52,11 +54,15 @@ class JobListingsTUI(App):
         table = self.query_one("#jobs", VimDataTable)
         if table.cursor_row is None:
             return
-        job_id = table.get_cell_at(Coordinate(table.cursor_row, 0))
+        job_id = table.get_cell_at(Coordinate(table.cursor_row, 0)).plain
         job = self._jobs_by_id[job_id]
         url = job["job_url_direct"] or job["job_url"]
         pyperclip.copy(url)
-        self.notify(f"URL copied for job: {job['title']} at {job['company']}", timeout=3, severity="information")
+        self.notify(
+            f"URL copied for job: {job['title']} at {job['company']}",
+            timeout=3,
+            severity="information",
+        )
 
     def _refresh_job_row(self, result):
         if result and result.get("updated"):
@@ -75,10 +81,12 @@ class JobListingsTUI(App):
                 visible_columns = {c.name for c in columns}
                 for field in updated_fields:
                     if field in visible_columns:
+                        cell = table.get_cell(row_key=job_id, column_key=field)
+                        cell.plain = str(self._jobs.at[job_index, field])
                         table.update_cell(
                             row_key=job_id,
                             column_key=field,
-                            value=str(self._jobs.at[job_index, field]),
+                            value=cell,
                         )
 
     def action_open_scrape_menu(self) -> None:
@@ -90,6 +98,7 @@ class JobListingsTUI(App):
         new_jobs = result["new_jobs"]
         if new_jobs.empty:
             return
+        self._session_new_job_ids.update(new_jobs["id"].unique())
         self._jobs = pd.concat([self._jobs, new_jobs], ignore_index=True)
         self._render_table(self._jobs)
 
@@ -100,6 +109,7 @@ class JobListingsTUI(App):
     def __init__(self) -> None:
         super().__init__()
         self._jobs = load_existing_jobs()
+        self._session_new_job_ids: set[str] = set()
 
     def _render_table(
         self, df: pd.DataFrame, sort=True, sort_key="date_posted"
@@ -123,9 +133,12 @@ class JobListingsTUI(App):
         for _, row in df.iterrows():
             if row.get("hidden", False):
                 continue
-            values = [row[c.name] for c in columns]
-            table.add_row(*[str(v) for v in values], key=row["id"])
-            self._jobs_by_id[row["id"]] = row
+            jobid = row["id"]
+            values = (str(row[c.name]) for c in columns)
+            style = "italic #03AC13" if jobid in self._session_new_job_ids else ""
+            styled_row = (Text(v, style=style) for v in values) 
+            table.add_row(*styled_row, key=str(row["id"]))
+            self._jobs_by_id[jobid] = row
 
     def on_mount(self) -> None:
         table = self.query_one("#jobs", VimDataTable)
