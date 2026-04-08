@@ -2,8 +2,8 @@ from typing import Union, Sequence
 
 import pyperclip
 
-from src.backend.storage import update_job_fields
-from src.backend.fit_score import score_job
+from joblistings_tui.backend.storage import update_job_fields
+from joblistings_tui.backend.fit_score import score_job
 
 from textual import on, work
 from textual.app import ComposeResult

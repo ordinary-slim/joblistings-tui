@@ -1,7 +1,7 @@
 import pandas as pd
 
-from src.backend.fetch import load_queries, ALL_JOB_SITES, DEFAULT_JOB_SITES, JOB_SITE_LABELS
-from src.backend.main import search_jobs
+from joblistings_tui.backend.fetch import load_queries, ALL_JOB_SITES, DEFAULT_JOB_SITES, JOB_SITE_LABELS
+from joblistings_tui.backend.main import search_jobs
 
 from textual import work
 from textual.app import ComposeResult
@@ -17,7 +17,7 @@ from textual.containers import (
 )
 
 from .widgets import VimVerticalScroll, IntuitiveInput, VimPrinter
-from config import QUERIES_FILE
+from joblistings_tui.config import QUERIES_FILE
 
 class ScrapeScreen(ModalScreen):
     BINDINGS = [

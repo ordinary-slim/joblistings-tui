@@ -1,5 +1,6 @@
 from joblistings_tui.tui.main_screen import JobListingsTUI
 
-if __name__ == "__main__":
+
+def main() -> None:
     app = JobListingsTUI()
     app.run()

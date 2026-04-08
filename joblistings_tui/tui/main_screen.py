@@ -3,7 +3,7 @@ from collections import namedtuple
 
 import pyperclip
 
-from src.backend.storage import load_existing_jobs
+from joblistings_tui.backend.storage import load_existing_jobs
 
 from textual.coordinate import Coordinate
 from textual.app import App, ComposeResult

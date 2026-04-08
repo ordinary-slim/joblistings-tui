@@ -2,8 +2,9 @@ import pandas as pd
 from typing import Union, Sequence
 
 from sqlalchemy import create_engine, inspect, text
+from joblistings_tui.config import DB_FILE
 
-DB_URL = "sqlite:///data/jobs.db"
+DB_URL = f"sqlite:///{DB_FILE}"
 TABLE_NAME = "jobs"
 
 def initialize_db() -> None:

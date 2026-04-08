@@ -11,7 +11,7 @@ from .storage import (
 from .fit_score import score_jobs
 
 import argparse
-from config import QUERIES_FILE
+from joblistings_tui.config import QUERIES_FILE
 
 
 def search_jobs(
@@ -96,7 +96,7 @@ def advertise_new_jobs(new_jobs: pd.DataFrame) -> None:
     print(f"Saved new jobs to: {filename}")
 
 
-if __name__ == "__main__":
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Search for new jobs and save them to the database."
     )
@@ -131,3 +131,7 @@ if __name__ == "__main__":
     search_jobs(
         queries, jobsites=args.jobsites, results_wanted=args.results, trial=args.trial
     )
+
+
+if __name__ == "__main__":
+    main()

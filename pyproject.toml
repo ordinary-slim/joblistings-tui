@@ -1,13 +1,25 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "joblistings_tui"
+name = "joblistings-tui"
 version = "0.1.0"
+description = "Terminal UI for scraping and reviewing job listings"
+requires-python = ">=3.11"
+dynamic = ["dependencies"]
 
-[tool.setuptools]
-package-dir = {"" = "joblistings_tui"}
+[project.scripts]
+joblistings-tui = "joblistings_tui.cli:main"
+joblistings-scrape = "joblistings_tui.backend.main:main"
 
 [tool.setuptools.packages.find]
-where = ["joblistings_tui"]
+where = ["."]
+include = ["joblistings_tui*"]
+
+# Check whether I need to add things here
+[tool.setuptools.package-data]
+"joblistings_tui.tui" = ["*.tcss"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
