@@ -124,3 +124,13 @@ JobDetailScreen {
 #search-location-input {
     width: 1fr;
 }
+
+#jobsites-dialog {
+  width: 60%;
+  height: 60%;
+}
+
+JobBoardsScreen {
+    align: center middle;
+    background: $background 60%;
+}

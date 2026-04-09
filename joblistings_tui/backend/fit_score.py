@@ -21,6 +21,15 @@ IMPORTANT FACTORS:
 - Consider transferable experience (automation, scripting, API work)
 - Factor in the candidate's project experience
 - Be realistic about experience level vs. job requirements (years of experience, seniority)
+- If the resume contains a "Target Roles & Preferences" section, treat it as a first-class signal
+- Penalize jobs that conflict with stated deal-breakers, even if technical fit is otherwise strong
+- Prioritize jobs that match stated target roles/domains/technologies, even if technical fit is otherwise weak
+
+PREFERENCE HANDLING RULES:
+- Combine technical fit and preference fit in the final score
+- If a job clearly matches a deal-breaker (e.g., internship, thesis role), score at most 2
+- If technical fit is strong but preference fit is weak, cap score at 6
+- In REASONING, explicitly mention both technical fit and preference alignment
 
 RESPOND IN EXACTLY THIS FORMAT (no other text):
 SCORE: [1-10]

@@ -24,7 +24,8 @@ from .widgets import VimVerticalScroll, IntuitiveInput
 class JobDetailScreen(ModalScreen):
     BINDINGS = [
         Binding("escape", "close", "Close"),
-        Binding("y", "yank", "Copy URL"),
+        Binding("y", "yank_url", "Copy URL"),
+        Binding("Y", "yank_description", "Copy description"),
         Binding("s", "score", "LLM-score"),
     ]
 
@@ -92,9 +93,28 @@ class JobDetailScreen(ModalScreen):
             self._update_job_fields_in_db("hidden", event.value)
             self._updated["hidden"] = event.value
 
-    def action_yank(self) -> None:
+    def action_yank_url(self) -> None:
         pyperclip.copy(self.url)
-        self.notify("URL copied.", timeout=3, severity="information")
+        self.notify("URL copied.", timeout=2, severity="information")
+
+    def action_yank_description(self) -> None:
+        description = "\n".join(
+            [
+                f"Title: {self.job.get('title', '')}",
+                f"Company: {self.job.get('company', '')}",
+                f"Location: {self.job.get('location', '')}",
+                f"Date Posted: {self.job.get('date_posted', '')}",
+                f"Job Type: {self.job.get('job_type', '')}",
+                f"Salary: {self.job.get('salary_source', '')} {self.job.get('currency', '')} per {self.job.get('interval', '')}",
+                f"Remote: {'Yes' if self.job.get('is_remote') else 'No'}",
+                f"URL: {self.url}",
+                f"Description:\n{self.job.get('description', '')}",
+                f"Fit score (1-10): {self.job.get('fit_score', '')}",
+                f"Fit keywords: {self.job.get('fit_keywords', '')}",
+            ]
+        )
+        pyperclip.copy(description)
+        self.notify("Description copied.", timeout=2, severity="information")
 
     def action_score(self, verbose=True) -> None:
         if verbose:
