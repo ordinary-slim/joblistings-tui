@@ -6,6 +6,8 @@ from joblistings_tui.config import DB_FILE
 
 DB_URL = f"sqlite:///{DB_FILE}"
 TABLE_NAME = "jobs"
+ADDED_FIELDS = ["applied", "fit_score", "fit_keywords", "fit_reasoning", "hidden", "saved"]
+DEFAULT_VALS = [False, 0.0, "", "", False, False]
 
 def initialize_db() -> None:
     engine = create_engine(DB_URL)
@@ -58,11 +60,9 @@ def initialize_db() -> None:
 
 def normalize_jobspy_dataframe(jobs: pd.DataFrame) -> pd.DataFrame:
     '''Modify in-place but still return the DataFrame for chaining'''
-    jobs["applied"] = False
-    jobs["fit_score"] = 0.0
-    jobs["fit_keywords"] = ""
-    jobs["fit_reasoning"] = ""
-    jobs["hidden"] = False
+    for field, default in zip(ADDED_FIELDS, DEFAULT_VALS):
+        if field not in jobs.columns:
+            jobs[field] = default
     return jobs
 
 def load_existing_jobs() -> pd.DataFrame:
@@ -127,7 +127,7 @@ def update_job_fields(
     fields: Union[str, Sequence[str]],
     values: Union[float, bool, str, Sequence[Union[float, bool, str]]],
 ) -> None:
-    allowed_fields = {"applied", "hidden", "fit_score", "fit_keywords", "fit_reasoning"}
+    allowed_fields = set(ADDED_FIELDS)  # Only allow updating these fields for now
 
     # Normalize to lists
     if isinstance(fields, str):

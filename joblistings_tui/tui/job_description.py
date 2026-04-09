@@ -61,6 +61,7 @@ class JobDetailScreen(ModalScreen):
                 "Applied", value=self.job["applied"], id="job-details-applied"
             )
             yield Checkbox("Hidden", value=self.job["hidden"], id="job-details-hidden")
+            yield Checkbox("Saved", value=self.job["saved"], id="job-details-saved")
             yield Label("Fit score", id="job-details-interest-score-label")
             yield IntuitiveInput(
                 value=str(self.job["fit_score"]),
@@ -84,14 +85,16 @@ class JobDetailScreen(ModalScreen):
         # self._updated = {"fit_reasoning": value}
 
     def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
-        if event.checkbox.id == "job-details-applied":
-            self.job["applied"] = event.value
-            self._update_job_fields_in_db("applied", event.value)
-            self._updated["applied"] = event.value
-        elif event.checkbox.id == "job-details-hidden":
-            self.job["hidden"] = event.value
-            self._update_job_fields_in_db("hidden", event.value)
-            self._updated["hidden"] = event.value
+        checkbox_id_to_field = {
+            "job-details-applied": "applied",
+            "job-details-hidden": "hidden",
+            "job-details-saved": "saved",
+        }
+        key = checkbox_id_to_field.get(event.checkbox.id)
+        if key is not None:
+            self.job[key] = event.value
+            self._update_job_fields_in_db(key, event.value)
+            self._updated[key] = event.value
 
     def action_yank_url(self) -> None:
         pyperclip.copy(self.url)

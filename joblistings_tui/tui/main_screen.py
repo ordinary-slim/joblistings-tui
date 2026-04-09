@@ -1,10 +1,11 @@
 import pandas as pd
 from collections import namedtuple
 from rich.text import Text
+from typing import Sequence, Union
 
 import pyperclip
 
-from joblistings_tui.backend.storage import load_existing_jobs
+from joblistings_tui.backend.storage import load_existing_jobs, update_job_fields
 
 from textual.coordinate import Coordinate
 from textual.app import App, ComposeResult
@@ -34,11 +35,14 @@ class JobListingsTUI(App):
 
     CSS_PATH = "tui.tcss"
     BINDINGS = [
-        Binding("d", "toggle_dark", "Toggle dark mode"),
-        Binding("s", "open_scrape_menu", "Open scrape menu"),
-        Binding("o", "open_job", "Open job details"),
-        Binding("y", "yank_job_url", "Copy job URL"),
         Binding("q", "quit", "Quit"),
+        Binding("s", "toggle_save_job", "Save"),
+        Binding("x", "hide_job", "Hide"),
+        Binding("y", "yank_job_url", "Copy URL"),
+        Binding("o", "open_job", "Open"),
+        Binding("enter", "open_job", "Open", show=False),
+        Binding("D", "toggle_dark", "Theme"),
+        Binding("S", "open_scrape_menu", "Scrape"),
     ]
 
     def action_open_job(self) -> None:
@@ -50,11 +54,22 @@ class JobListingsTUI(App):
                 JobDetailScreen(jobdetails), callback=self._refresh_job_row
             )
 
-    def action_yank_job_url(self) -> None:
+    def _get_job_id_at_cursor(self) -> str | None:
         table = self.query_one("#jobs", VimDataTable)
         if table.cursor_row is None:
             return
-        job_id = table.get_cell_at(Coordinate(table.cursor_row, 0)).plain
+        return table.get_cell_at(Coordinate(table.cursor_row, 0)).plain
+
+    def _update_job_field(
+        self,
+        job_id: str,
+        fields: Union[str, Sequence[str]],
+        values: Union[float, bool, str, Sequence[Union[float, bool, str]]],
+    ) -> None:
+        update_job_fields(job_id, fields, values)
+
+    def action_yank_job_url(self) -> None:
+        job_id = self._get_job_id_at_cursor()
         job = self._jobs_by_id[job_id]
         url = job["job_url_direct"] or job["job_url"]
         pyperclip.copy(url)
@@ -64,6 +79,30 @@ class JobListingsTUI(App):
             severity="information",
         )
 
+    def action_hide_job(self) -> None:
+        job_id = self._get_job_id_at_cursor()
+        if job_id is None:
+            return
+        self._update_job_field(job_id, "hidden", True)
+        self._jobs.loc[self._jobs["id"] == job_id, "hidden"] = True
+        self._refresh_job_row({"job_id": job_id, "updated": {"hidden": True}})
+        job = self._jobs_by_id[job_id]
+        self.notify(
+            f"Hid job {job['title']} at {job['company']}",
+            timeout=3,
+            severity="information",
+        )
+
+    def action_toggle_save_job(self) -> None:
+        job_id = self._get_job_id_at_cursor()
+        if job_id is None:
+            return
+        job = self._jobs_by_id[job_id]
+        newval = not(job["saved"])
+        self._update_job_field(job_id, "saved", newval)
+        self._jobs.loc[self._jobs["id"] == job_id, "saved"] = newval
+        self._refresh_job_row({"job_id": job_id, "updated": {"saved": newval}})
+
     def _refresh_job_row(self, result):
         if result and result.get("updated"):
             updated_fields = result["updated"]
@@ -72,22 +111,21 @@ class JobListingsTUI(App):
             job_index = self._jobs.index[self._jobs["id"] == result["job_id"]][0]
             for field, value in updated_fields.items():
                 self._jobs.at[job_index, field] = value
+            self._jobs_by_id[job_id] = self._jobs.loc[job_index]
             # Re-render table row
             table = self.query_one("#jobs", VimDataTable)
-            hidden = updated_fields.pop("hidden", False)
+            hidden = updated_fields.get("hidden", False)
             if hidden:
                 table.remove_row(job_id)
             else:
-                visible_columns = {c.name for c in columns}
-                for field in updated_fields:
-                    if field in visible_columns:
-                        cell = table.get_cell(row_key=job_id, column_key=field)
-                        cell.plain = str(self._jobs.at[job_index, field])
-                        table.update_cell(
-                            row_key=job_id,
-                            column_key=field,
-                            value=cell,
-                        )
+                job = self._jobs_by_id[job_id]
+                row_style = self._get_row_format(job)
+                for column in columns:
+                    table.update_cell(
+                        row_key=job_id,
+                        column_key=column.name,
+                        value=Text(str(job[column.name]), style=row_style),
+                    )
 
     def action_open_scrape_menu(self) -> None:
         self.push_screen(ScrapeScreen(), callback=self._refresh_after_scrape)
@@ -130,15 +168,22 @@ class JobListingsTUI(App):
 
         self._jobs_by_id = dict()
 
-        for _, row in df.iterrows():
-            if row.get("hidden", False):
+        for _, job in df.iterrows():
+            if job.get("hidden", False):
                 continue
-            jobid = row["id"]
-            values = (str(row[c.name]) for c in columns)
-            style = "italic #03AC13" if jobid in self._session_new_job_ids else ""
-            styled_row = (Text(v, style=style) for v in values) 
-            table.add_row(*styled_row, key=str(row["id"]))
-            self._jobs_by_id[jobid] = row
+            jobid = job["id"]
+            values = (str(job[c.name]) for c in columns)
+            style = self._get_row_format(job)
+            styled_row = (Text(v, style=style) for v in values)
+            table.add_row(*styled_row, key=str(job["id"]))
+            self._jobs_by_id[jobid] = job
+
+    def _get_row_format(self, job) -> str:
+        if job["id"] in self._session_new_job_ids:
+            return "italic #03AC13"
+        elif job["saved"]:
+            return "bold #F2B705"
+        return ""
 
     def on_mount(self) -> None:
         table = self.query_one("#jobs", VimDataTable)
