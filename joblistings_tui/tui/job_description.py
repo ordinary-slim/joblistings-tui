@@ -1,4 +1,4 @@
-from typing import Union, Sequence
+from typing import Callable, Union, Sequence
 
 import pyperclip
 
@@ -27,15 +27,21 @@ class JobDetailScreen(ModalScreen):
         Binding("y", "yank_url", "Copy URL"),
         Binding("Y", "yank_description", "Copy description"),
         Binding("s", "score", "LLM-score"),
+        Binding("c", "run_user_hook", "Run user script"),
     ]
 
     fit_keywords = reactive("")
     fit_reasoning = reactive("")
 
-    def __init__(self, job: dict) -> None:
+    def __init__(
+        self,
+        job: dict,
+        custom_hook: Callable[[dict], str | None] | None = None,
+    ) -> None:
         super().__init__()
         self.job = job
         self._updated = {}
+        self._custom_hook = custom_hook
 
     def compose(self) -> ComposeResult:
         with VimVerticalScroll(id="job-detail-content"):
@@ -90,6 +96,8 @@ class JobDetailScreen(ModalScreen):
             "job-details-hidden": "hidden",
             "job-details-saved": "saved",
         }
+        if event.checkbox.id is None:
+            return
         key = checkbox_id_to_field.get(event.checkbox.id)
         if key is not None:
             self.job[key] = event.value
@@ -123,6 +131,13 @@ class JobDetailScreen(ModalScreen):
         if verbose:
             self.notify("Scoring job with LLM...", timeout=5, severity="information")
         self._score_job_with_llm()
+
+    def action_run_user_hook(self) -> None:
+        if self._custom_hook is None:
+            return
+        log = self._custom_hook(self.job)
+        if log:
+            self.notify(log, timeout=10, severity="information")
 
     @work(thread=True, exclusive=True)
     def _score_job_with_llm(self) -> dict:

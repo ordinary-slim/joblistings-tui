@@ -8,7 +8,7 @@ from textual.widgets import Footer, Static
 from .widgets import IntuitiveInput
 
 
-class FilterQueryScreen(ModalScreen):
+class FilterBar(ModalScreen):
     BINDINGS = [
         Binding("escape", "close", "Close", show=True),
     ]

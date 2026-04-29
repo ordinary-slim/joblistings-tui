@@ -1,11 +1,12 @@
 import pandas as pd
 from collections import namedtuple
 from rich.text import Text
-from typing import Sequence, Union
+from typing import Callable, Sequence, Union
 
 import pyperclip
 
 from joblistings_tui.backend.storage import load_existing_jobs, update_job_fields
+from joblistings_tui.backend.filter_jobs import filter_jobs_df
 
 from textual.coordinate import Coordinate
 from textual.app import App, ComposeResult
@@ -17,6 +18,7 @@ from .widgets import VimDataTable
 
 from .job_description import JobDetailScreen
 from .scrape_menu import ScrapeScreen
+from .filter_bar import FilterBar
 
 TUIColumn = namedtuple("TUIColumn", ["name", "width"])
 columns = [
@@ -35,6 +37,7 @@ class JobListingsTUI(App):
 
     CSS_PATH = "tui.tcss"
     BINDINGS = [
+        Binding("/", "filter", "Filter"),
         Binding("q", "quit", "Quit"),
         Binding("s", "toggle_save_job", "Save"),
         Binding("x", "hide_job", "Hide"),
@@ -51,7 +54,8 @@ class JobListingsTUI(App):
             job_id = table.get_cell_at(Coordinate(table.cursor_row, 0)).plain
             jobdetails = self._jobs[self._jobs["id"] == job_id].iloc[0].to_dict()
             self.push_screen(
-                JobDetailScreen(jobdetails), callback=self._refresh_job_row
+                JobDetailScreen(jobdetails, custom_hook=self._custom_hook),
+                callback=self._refresh_job_row,
             )
 
     def _get_job_id_at_cursor(self) -> str | None:
@@ -67,6 +71,15 @@ class JobListingsTUI(App):
         values: Union[float, bool, str, Sequence[Union[float, bool, str]]],
     ) -> None:
         update_job_fields(job_id, fields, values)
+
+    def _refresh_after_filter(self, result) -> None:
+        if not (isinstance(result, str)):
+            return
+        filtered_jobs = filter_jobs_df(result, self._jobs)
+        self._render_table(filtered_jobs, sort=False)
+
+    def action_filter(self) -> None:
+        self.push_screen(FilterBar(), callback=self._refresh_after_filter)
 
     def action_yank_job_url(self) -> None:
         job_id = self._get_job_id_at_cursor()
@@ -98,7 +111,7 @@ class JobListingsTUI(App):
         if job_id is None:
             return
         job = self._jobs_by_id[job_id]
-        newval = not(job["saved"])
+        newval = not (job["saved"])
         self._update_job_field(job_id, "saved", newval)
         self._jobs.loc[self._jobs["id"] == job_id, "saved"] = newval
         self._refresh_job_row({"job_id": job_id, "updated": {"saved": newval}})
@@ -144,10 +157,11 @@ class JobListingsTUI(App):
         yield Footer()
         yield VimDataTable(id="jobs")
 
-    def __init__(self) -> None:
+    def __init__(self, custom_hook: Callable[[dict], str | None] | None = None) -> None:
         super().__init__()
         self._jobs = load_existing_jobs()
         self._session_new_job_ids: set[str] = set()
+        self._custom_hook = custom_hook
 
     def _render_table(
         self, df: pd.DataFrame, sort=True, sort_key="date_posted"

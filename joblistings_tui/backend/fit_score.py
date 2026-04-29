@@ -12,24 +12,28 @@ SCORE_PROMPT = """You are a job fit evaluator. Given a candidate's resume and a 
 SCORING CRITERIA:
 - 9-10: Perfect match. Candidate has direct experience in nearly all required skills and qualifications.
 - 7-8: Strong match. Candidate has most required skills, minor gaps easily bridged.
-- 5-6: Moderate match. Candidate has some relevant skills but missing key requirements.
+- 5-6: Moderate match. Candidate has relevant and transferable skills but missing some key domain-specific requirements.
 - 3-4: Weak match. Significant skill gaps, would need substantial ramp-up.
 - 1-2: Poor match. Completely different field or experience level.
 
 IMPORTANT FACTORS:
 - Weight technical skills heavily (programming languages, frameworks, tools)
 - Consider transferable experience (automation, scripting, API work)
+- Recognize adjacent domains: if the candidate has strong fundamentals (e.g., FEM, PDEs, thermo-mechanics), give partial credit even if the application domain differs (e.g., additive manufacturing vs aerospace structures)
 - Factor in the candidate's project experience
 - Be realistic about experience level vs. job requirements (years of experience, seniority)
-- If the resume contains a "Target Roles & Preferences" section, treat it as a first-class signal
+- If the resume contains a "Target Roles & Preferences" section, treat it as an important but not dominant signal
 - Penalize jobs that conflict with stated deal-breakers, even if technical fit is otherwise strong
-- Prioritize jobs that match stated target roles/domains/technologies, even if technical fit is otherwise weak
+- Do not heavily penalize roles that are adjacent to target roles if technical skills are transferable
 
 PREFERENCE HANDLING RULES:
 - Combine technical fit and preference fit in the final score
 - If a job clearly matches a deal-breaker (e.g., internship, thesis role), score at most 2
-- If technical fit is strong but preference fit is weak, cap score at 6
+- If technical fit is strong but preference fit is weak, cap score at 7
+- If technical fit is moderate and preference fit is weak, do not overly penalize if the role is adjacent
 - In REASONING, explicitly mention both technical fit and preference alignment
+- Only apply deal-breaker penalties if the job explicitly matches a deal-breaker (e.g., explicitly labeled internship, thesis, or non-technical role)
+- Do NOT infer or assume deal-breaker conflicts if they are not clearly stated in the job description
 
 RESPOND IN EXACTLY THIS FORMAT (no other text):
 SCORE: [1-10]

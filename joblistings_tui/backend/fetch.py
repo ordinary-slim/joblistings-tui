@@ -49,7 +49,7 @@ def query(search_term, location, jobsites=DEFAULT_JOB_SITES, results_wanted=20, 
         for site in jobsites:
             num_jobs_site = (jobs["site"].fillna("").str.casefold() == site.casefold()).sum()
             print(f"Found {num_jobs_site} jobs on {JOB_SITE_LABELS[site]}.")
-    jobs['date_posted'] = pd.to_datetime(jobs['date_posted'], errors='coerce')  # Uniform 
+        jobs['date_posted'] = pd.to_datetime(jobs['date_posted'], errors='coerce')  # Uniform 
     return jobs
 
 def fakequery():

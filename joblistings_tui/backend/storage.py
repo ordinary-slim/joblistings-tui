@@ -78,7 +78,7 @@ def load_existing_jobs() -> pd.DataFrame:
     df = pd.read_sql_table(TABLE_NAME, engine)
 
     # Convert `date_posted` column to datetime
-    df["date_posted"] = pd.to_datetime(df["date_posted"], errors="coerce")
+    df["date_posted"] = pd.to_datetime(df["date_posted"], format="mixed")
 
     return df
 
