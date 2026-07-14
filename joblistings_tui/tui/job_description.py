@@ -1,5 +1,7 @@
 from typing import Callable, Union, Sequence
 
+import pandas as pd
+
 import pyperclip
 
 from joblistings_tui.backend.storage import update_job_fields
@@ -19,6 +21,14 @@ from textual.containers import (
 )
 
 from .widgets import VimVerticalScroll, IntuitiveInput
+
+
+def get_job_url(job: dict) -> str:
+    for field in ("job_url_direct", "job_url"):
+        value = job.get(field, "")
+        if pd.notna(value) and value != "":
+            return str(value)
+    return ""
 
 
 class JobDetailScreen(ModalScreen):
@@ -54,7 +64,7 @@ class JobDetailScreen(ModalScreen):
                 f"Salary: {self.job.get('salary_source', '')} {self.job.get('currency', '')} per {self.job.get('interval', '')}"
             )
             yield Static(f"Remote: {'Yes' if self.job.get('is_remote') else 'No'}")
-            self.url = self.job.get("job_url_direct") or self.job.get("job_url", "")
+            self.url = get_job_url(self.job)
             yield Static(f"URL: {self.url}")
 
             yield Static(id="fit-keywords")

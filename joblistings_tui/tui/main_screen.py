@@ -16,7 +16,7 @@ from textual.widgets import Footer
 
 from .widgets import VimDataTable
 
-from .job_description import JobDetailScreen
+from .job_description import JobDetailScreen, get_job_url
 from .scrape_menu import ScrapeScreen
 from .filter_bar import FilterBar
 
@@ -84,7 +84,7 @@ class JobListingsTUI(App):
     def action_yank_job_url(self) -> None:
         job_id = self._get_job_id_at_cursor()
         job = self._jobs_by_id[job_id]
-        url = job["job_url_direct"] or job["job_url"]
+        url = get_job_url(job)
         pyperclip.copy(url)
         self.notify(
             f"URL copied for job: {job['title']} at {job['company']}",

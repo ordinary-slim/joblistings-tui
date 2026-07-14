@@ -79,7 +79,7 @@ class ScrapeScreen(ModalScreen):
                     # Checkbox for "Score with LLM"
                     yield Checkbox(
                         "Score with LLM",
-                        value=True,
+                        value=False,
                         id="scrape-score-with-llm",
                     )
 

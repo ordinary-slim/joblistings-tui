@@ -83,6 +83,7 @@ def advertise_new_jobs(new_jobs: pd.DataFrame) -> None:
             f"(site: {row['site']}, fit_score: {row['fit_score']}, URL: {url})"
         )
 
+    # TODO: Remove this
     # --- write CSV with timestamp ---
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 

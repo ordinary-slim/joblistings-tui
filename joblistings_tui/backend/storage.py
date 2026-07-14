@@ -50,7 +50,10 @@ def initialize_db() -> None:
             work_from_home_type TEXT,
             applied BOOLEAN,
             fit_score FLOAT,
-            hidden BOOLEAN
+            fit_keywords TEXT,
+            fit_reasoning TEXT,
+            hidden BOOLEAN,
+            saved BOOLEAN
         )
         """
     )
@@ -63,6 +66,9 @@ def normalize_jobspy_dataframe(jobs: pd.DataFrame) -> pd.DataFrame:
     for field, default in zip(ADDED_FIELDS, DEFAULT_VALS):
         if field not in jobs.columns:
             jobs[field] = default
+    for field in ["job_url_direct", "job_url"]:
+        if field in jobs.columns:
+            jobs[field] = jobs[field].astype(object).where(pd.notna(jobs[field]), None)
     return jobs
 
 def load_existing_jobs() -> pd.DataFrame:
